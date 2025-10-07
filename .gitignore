@@ -1,0 +1,29 @@
+# Ansible
+*.retry
+.vault_password
+
+# Python
+*.pyc
+__pycache__/
+.Python
+
+# Environment files
+.env
+*.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Vagrant
+.vagrant/
