@@ -1,0 +1,6 @@
+---
+# Certbot role default variables
+certbot_email: admin@example.com
+certbot_domain: mattermost.example.com
+certbot_create_if_missing: true
+certbot_admin_email: "{{ certbot_email }}"

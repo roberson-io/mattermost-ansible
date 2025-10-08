@@ -1,0 +1,9 @@
+---
+# Debian/Ubuntu-specific variables
+nginx_package: nginx
+nginx_service_name: nginx
+nginx_config_dir: /etc/nginx
+nginx_sites_available: /etc/nginx/sites-available
+nginx_sites_enabled: /etc/nginx/sites-enabled
+nginx_default_site: /etc/nginx/sites-enabled/default
+nginx_use_sites_enabled: true

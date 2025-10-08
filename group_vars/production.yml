@@ -1,0 +1,32 @@
+---
+# Production environment configuration
+
+# PostgreSQL configuration
+postgresql_allow_remote: true
+postgresql_listen_addresses: "*"
+postgresql_db_name: mattermost
+postgresql_db_user: mmuser
+postgresql_db_password: "CHANGE_ME_PRODUCTION_PASSWORD"
+
+# Mattermost configuration
+mattermost_version: "10.12.0"
+mattermost_db_host: "{{ hostvars[groups['database'][0]]['ansible_default_ipv4']['address'] }}"
+mattermost_db_port: 5432
+mattermost_db_name: mattermost
+mattermost_db_user: mmuser
+mattermost_db_password: "CHANGE_ME_PRODUCTION_PASSWORD"
+mattermost_site_url: "https://{{ nginx_server_name }}"
+
+# Nginx and TLS configuration
+use_nginx: true
+use_tls: true
+nginx_server_name: mattermost.example.com
+nginx_upstream_host: localhost
+nginx_upstream_port: 8065
+nginx_ssl_enabled: true
+nginx_force_https: true
+
+# Certbot/Let's Encrypt
+certbot_email: admin@example.com
+certbot_domain: "{{ nginx_server_name }}"
+certbot_create_if_missing: true

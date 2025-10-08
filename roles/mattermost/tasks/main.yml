@@ -1,0 +1,136 @@
+---
+- name: Include OS-specific variables
+  ansible.builtin.include_vars: "{{ ansible_os_family }}.yml"
+- name: Update apt cache (Debian/Ubuntu)
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_os_family == "Debian"
+
+- name: Remove curl-minimal if present (RedHat/Rocky)
+  ansible.builtin.package:
+    name: curl-minimal
+    state: absent
+  when: ansible_os_family == "RedHat"
+  failed_when: false
+
+- name: Install required packages
+  ansible.builtin.package:
+    name: "{{ mattermost_packages }}"
+    state: present
+
+- name: Check if Mattermost is already installed
+  ansible.builtin.stat:
+    path: "{{ mattermost_install_path }}/bin/mattermost"
+  register: mattermost_binary
+
+- name: Download Mattermost
+  ansible.builtin.get_url:
+    url: "https://releases.mattermost.com/{{ mattermost_version }}/mattermost-{{ mattermost_version }}-linux-amd64.tar.gz"
+    dest: /tmp/mattermost.tar.gz
+    mode: "0644"
+  when: not mattermost_binary.stat.exists
+
+- name: Extract Mattermost
+  ansible.builtin.unarchive:
+    src: /tmp/mattermost.tar.gz
+    dest: /opt
+    remote_src: true
+    creates: "{{ mattermost_install_path }}"
+  when: not mattermost_binary.stat.exists
+
+- name: Create mattermost user
+  ansible.builtin.user:
+    name: mattermost
+    system: true
+    shell: /bin/bash
+    home: "{{ mattermost_install_path }}"
+    createhome: false
+
+- name: Create Mattermost data directory
+  ansible.builtin.file:
+    path: "{{ mattermost_install_path }}/data"
+    state: directory
+    owner: mattermost
+    group: mattermost
+    mode: "0755"
+
+- name: Set Mattermost directory ownership
+  ansible.builtin.file:
+    path: "{{ mattermost_install_path }}"
+    owner: mattermost
+    group: mattermost
+    recurse: true
+
+- name: Debug database host value
+  ansible.builtin.debug:
+    msg: "Database host will be: {{ mattermost_db_host | default('UNDEFINED') }}"
+
+- name: Configure Mattermost database connection
+  ansible.builtin.replace:
+    path: "{{ mattermost_install_path }}/config/config.json"
+    regexp: '"DataSource":\s*"postgres://[^"]*"'
+    replace: >-
+      "DataSource": "postgres://{{ mattermost_db_user }}:{{ mattermost_db_password }}@{{
+      mattermost_db_host }}:{{ mattermost_db_port }}/{{ mattermost_db_name }}?sslmode=disable&connect_timeout=10"
+
+- name: Configure Mattermost site URL
+  ansible.builtin.replace:
+    path: "{{ mattermost_install_path }}/config/config.json"
+    regexp: '"SiteURL":\s*"[^"]*"'
+    replace: '"SiteURL": "{{ mattermost_site_url }}"'
+
+- name: Create Mattermost systemd service
+  ansible.builtin.template:
+    src: mattermost.service.j2
+    dest: /etc/systemd/system/mattermost.service
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart mattermost
+
+- name: Enable Mattermost service
+  ansible.builtin.systemd:
+    name: mattermost
+    enabled: true
+
+- name: Start Mattermost service
+  ansible.builtin.systemd:
+    name: mattermost
+    state: started
+  register: mattermost_start
+  failed_when: false
+  changed_when: mattermost_start is changed
+
+- name: Check if ufw is available (Debian/Ubuntu)
+  ansible.builtin.command: which ufw
+  register: mattermost_ufw_check
+  changed_when: false
+  failed_when: false
+  when: ansible_os_family == "Debian"
+
+- name: Allow Mattermost port through firewall (ufw - Debian/Ubuntu)
+  community.general.ufw:
+    rule: allow
+    port: "8065"
+    proto: tcp
+  when:
+    - ansible_os_family == "Debian"
+    - mattermost_ufw_check.rc == 0
+
+- name: Check if firewalld is available (RedHat)
+  ansible.builtin.command: which firewall-cmd
+  register: mattermost_firewalld_check
+  changed_when: false
+  failed_when: false
+  when: ansible_os_family == "RedHat"
+
+- name: Allow Mattermost port through firewall (firewalld - RedHat)
+  ansible.posix.firewalld:
+    port: 8065/tcp
+    permanent: true
+    state: enabled
+    immediate: true
+  when:
+    - ansible_os_family == "RedHat"
+    - mattermost_firewalld_check.rc == 0

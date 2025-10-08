@@ -1,0 +1,7 @@
+---
+# Debian/Ubuntu-specific variables
+certbot_packages:
+  - certbot
+  - python3-certbot-nginx
+
+certbot_service_name: certbot

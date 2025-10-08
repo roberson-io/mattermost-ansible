@@ -1,0 +1,18 @@
+[Unit]
+Description=Mattermost
+After=network.target
+
+[Service]
+Type=notify
+ExecStart={{ mattermost_install_path }}/bin/mattermost
+TimeoutStartSec=3600
+KillMode=mixed
+Restart=always
+RestartSec=10
+WorkingDirectory={{ mattermost_install_path }}
+User=mattermost
+Group=mattermost
+LimitNOFILE=49152
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,12 @@
+---
+# RedHat/CentOS/Rocky/Oracle Linux-specific variables
+postgresql_packages:
+  - postgresql-server
+  - postgresql-contrib
+  - python3-psycopg2
+
+postgresql_service_name: postgresql
+postgresql_config_dir: "/var/lib/pgsql/data"
+postgresql_config_file: "/var/lib/pgsql/data/postgresql.conf"
+postgresql_hba_file: "/var/lib/pgsql/data/pg_hba.conf"
+postgresql_needs_initdb: true

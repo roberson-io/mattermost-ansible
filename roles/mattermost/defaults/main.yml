@@ -1,0 +1,15 @@
+---
+# Mattermost role default variables
+mattermost_version: "10.12.0"
+mattermost_install_path: /opt/mattermost
+
+# Database connection (can be overridden in group_vars)
+mattermost_db_host: localhost
+mattermost_db_port: 5432
+mattermost_db_name: mattermost
+mattermost_db_user: mmuser
+mattermost_db_password: "mmuser_password_change_me"
+
+# Site configuration
+mattermost_site_url: "http://{{ ansible_default_ipv4.address }}:8065"
+mattermost_listen_address: ":8065"

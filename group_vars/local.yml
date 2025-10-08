@@ -1,0 +1,22 @@
+---
+# Local development environment configuration
+
+# PostgreSQL configuration
+postgresql_allow_remote: true
+postgresql_listen_addresses: "*"
+postgresql_db_name: mattermost
+postgresql_db_user: mmuser
+postgresql_db_password: "mmuser_password_change_me"
+
+# Mattermost configuration
+# Note: mattermost_db_host and mattermost_site_url are set dynamically in site.yml
+# using facts gathered from the hosts
+mattermost_version: "10.12.0"
+mattermost_db_port: 5432
+mattermost_db_name: mattermost
+mattermost_db_user: mmuser
+mattermost_db_password: "mmuser_password_change_me"
+
+# No nginx/TLS for local development
+use_nginx: false
+use_tls: false

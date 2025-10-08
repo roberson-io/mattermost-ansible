@@ -1,0 +1,33 @@
+# Local development environment inventory
+# Copy this file to local.ini and customize for your setup:
+#   cp inventory/local.ini.example inventory/local.ini
+#
+# Connection format examples:
+#
+# OrbStack:
+#   user@hostname@orb
+#
+# Multipass:
+#   user@hostname.mshome.net
+#
+# VirtualBox/Vagrant with IP:
+#   192.168.56.10 ansible_user=vagrant
+#
+# Standard SSH:
+#   hostname ansible_user=user ansible_host=192.168.1.10
+
+[database]
+# Example: your_user@postgresql@orb
+YOUR_USER@YOUR_DB_HOST
+
+[app]
+# Example: your_user@mattermost@orb
+YOUR_USER@YOUR_APP_HOST
+
+[mattermost:children]
+database
+app
+
+[mattermost:vars]
+ansible_python_interpreter=/usr/bin/python3
+environment=local

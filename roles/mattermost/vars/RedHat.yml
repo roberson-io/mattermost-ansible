@@ -1,0 +1,7 @@
+---
+# RedHat/CentOS/Rocky/Oracle Linux-specific variables
+mattermost_packages:
+  - curl
+  - tar
+
+mattermost_firewall_package: firewalld

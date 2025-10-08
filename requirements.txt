@@ -1,0 +1,26 @@
+# Development dependencies with flexible version ranges
+# For production/CI, use requirements.lock for reproducible builds
+#
+# To update the lock file after changing this file:
+#   source venv/bin/activate
+#   pip install -r requirements.txt
+#   pip freeze > requirements.lock
+
+# Ansible and core dependencies
+ansible>=2.9
+ansible-core>=2.18.0
+
+# Molecule testing framework
+molecule>=6.0
+molecule-plugins[docker]>=23.5
+
+# Linting and validation
+ansible-lint>=6.0
+yamllint>=1.26
+
+# Testing utilities
+testinfra>=6.0
+pytest>=7.0
+
+# Security scanning
+safety>=3.0

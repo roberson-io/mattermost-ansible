@@ -1,0 +1,13 @@
+---
+# PostgreSQL role default variables
+postgresql_listen_addresses: "*"
+postgresql_max_connections: 100
+
+# Database configuration
+# These should be overridden in group_vars to match mattermost settings
+postgresql_db_name: mattermost
+postgresql_db_user: mmuser
+postgresql_db_password: "mmuser_password_change_me"
+
+# Allow remote connections (set to false for local deployments)
+postgresql_allow_remote: true

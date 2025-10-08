@@ -1,0 +1,109 @@
+---
+- name: Include OS-specific variables
+  ansible.builtin.include_vars: "{{ ansible_os_family }}.yml"
+- name: Update apt cache (Debian/Ubuntu)
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_os_family == "Debian"
+
+- name: Install PostgreSQL packages
+  ansible.builtin.package:
+    name: "{{ postgresql_packages }}"
+    state: present
+
+- name: Initialize PostgreSQL database (RedHat)
+  ansible.builtin.command: postgresql-setup --initdb
+  args:
+    creates: "{{ postgresql_config_dir }}/postgresql.conf"
+  when: ansible_os_family == "RedHat" and postgresql_needs_initdb | default(false)
+
+- name: Start and enable PostgreSQL
+  ansible.builtin.systemd:
+    name: "{{ postgresql_service_name }}"
+    state: started
+    enabled: true
+
+- name: Find PostgreSQL config file (Debian/Ubuntu)
+  ansible.builtin.find:
+    paths: "{{ postgresql_config_dir }}"
+    patterns: "postgresql.conf"
+    recurse: true
+  register: postgresql_config_files
+  when: ansible_os_family == "Debian"
+
+- name: Set PostgreSQL config path (Debian/Ubuntu)
+  ansible.builtin.set_fact:
+    postgresql_conf_path: "{{ postgresql_config_files.files[0].path }}"
+    postgresql_hba_path: "{{ postgresql_config_files.files[0].path | dirname }}/pg_hba.conf"
+  when: ansible_os_family == "Debian"
+
+- name: Set PostgreSQL config path (RedHat)
+  ansible.builtin.set_fact:
+    postgresql_conf_path: "{{ postgresql_config_file }}"
+    postgresql_hba_path: "{{ postgresql_hba_file }}"
+  when: ansible_os_family == "RedHat"
+
+- name: Configure PostgreSQL password encryption to scram-sha-256
+  ansible.builtin.lineinfile:
+    path: "{{ postgresql_conf_path }}"
+    regexp: "^#?password_encryption"
+    line: "password_encryption = scram-sha-256"
+    state: present
+  notify: Restart postgresql
+
+- name: Configure PostgreSQL to listen on all interfaces
+  ansible.builtin.lineinfile:
+    path: "{{ postgresql_conf_path }}"
+    regexp: "^#?listen_addresses"
+    line: "listen_addresses = '{{ postgresql_listen_addresses }}'"
+    state: present
+  notify: Restart postgresql
+  when: postgresql_allow_remote
+
+- name: Configure PostgreSQL to allow remote connections
+  ansible.builtin.lineinfile:
+    path: "{{ postgresql_hba_path }}"
+    line: "host    {{ postgresql_db_name }}    {{ postgresql_db_user }}    0.0.0.0/0    scram-sha-256"
+    state: present
+  notify: Restart postgresql
+  when: postgresql_allow_remote
+
+- name: Create Mattermost database
+  become: true
+  become_user: postgres
+  community.postgresql.postgresql_db:
+    name: "{{ postgresql_db_name }}"
+    state: present
+
+- name: Create Mattermost database user
+  become: true
+  become_user: postgres
+  community.postgresql.postgresql_user:
+    name: "{{ postgresql_db_user }}"
+    password: "{{ postgresql_db_password }}"
+    encrypted: true
+    state: present
+  environment:
+    PGOPTIONS: "-c password_encryption=scram-sha-256"
+
+- name: Grant database privileges to Mattermost user
+  become: true
+  become_user: postgres
+  community.postgresql.postgresql_privs:
+    database: "{{ postgresql_db_name }}"
+    role: "{{ postgresql_db_user }}"
+    type: database
+    privs: ALL
+    state: present
+
+- name: Grant schema privileges to Mattermost user
+  become: true
+  become_user: postgres
+  community.postgresql.postgresql_privs:
+    database: "{{ postgresql_db_name }}"
+    role: "{{ postgresql_db_user }}"
+    type: schema
+    objs: public
+    privs: ALL
+    state: present

@@ -1,0 +1,12 @@
+---
+- name: Reload nginx
+  ansible.builtin.systemd:
+    name: "{{ nginx_service_name }}"
+    state: reloaded
+  failed_when: false
+
+- name: Restart nginx
+  ansible.builtin.systemd:
+    name: "{{ nginx_service_name }}"
+    state: restarted
+  failed_when: false

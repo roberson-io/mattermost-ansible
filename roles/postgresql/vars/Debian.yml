@@ -1,0 +1,11 @@
+---
+# Debian/Ubuntu-specific variables
+postgresql_packages:
+  - postgresql
+  - postgresql-contrib
+  - python3-psycopg2
+
+postgresql_service_name: postgresql
+postgresql_config_dir: "/etc/postgresql"
+postgresql_config_file_pattern: "*/main/postgresql.conf"
+postgresql_hba_file_pattern: "*/main/pg_hba.conf"

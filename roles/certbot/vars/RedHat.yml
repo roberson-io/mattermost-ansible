@@ -1,0 +1,9 @@
+---
+# RedHat/CentOS/Rocky/Oracle Linux-specific variables
+# Note: EPEL repository may be required for certbot on RedHat family
+certbot_packages:
+  - certbot
+  - python3-certbot-nginx
+
+certbot_service_name: certbot
+certbot_needs_epel: true

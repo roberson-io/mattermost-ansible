@@ -1,0 +1,65 @@
+---
+- name: Verify
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: Check PostgreSQL is installed (RedHat package name)
+      ansible.builtin.package:
+        name: postgresql-server
+        state: present
+      check_mode: true
+      register: pkg_check
+      failed_when: pkg_check is changed
+
+    - name: Check PostgreSQL service is running
+      ansible.builtin.service:
+        name: postgresql
+        state: started
+      check_mode: true
+      register: svc_check
+      failed_when: svc_check is changed
+
+    - name: Verify PostgreSQL was initialized (RedHat-specific check)
+      ansible.builtin.stat:
+        path: /var/lib/pgsql/data/postgresql.conf
+      register: pg_conf
+      failed_when: not pg_conf.stat.exists
+
+    - name: Verify pg_hba.conf exists in RedHat location
+      ansible.builtin.stat:
+        path: /var/lib/pgsql/data/pg_hba.conf
+      register: pg_hba
+      failed_when: not pg_hba.stat.exists
+
+    - name: Verify database exists
+      become: true
+      become_user: postgres
+      ansible.builtin.command: psql -lqt
+      register: db_list
+      changed_when: false
+      failed_when: "'mattermost' not in db_list.stdout"
+
+    - name: Verify database user exists
+      become: true
+      become_user: postgres
+      ansible.builtin.command: psql -t -c "SELECT 1 FROM pg_roles WHERE rolname='mmuser'"
+      register: user_check
+      changed_when: false
+      failed_when: "'1' not in user_check.stdout"
+
+    - name: Verify user has schema privileges
+      become: true
+      become_user: postgres
+      ansible.builtin.command: >
+        psql -d mattermost -t -c
+        "SELECT has_schema_privilege('mmuser', 'public', 'CREATE')"
+      register: priv_check
+      changed_when: false
+      failed_when: "'t' not in priv_check.stdout"
+
+    - name: Verify remote connections are configured (if enabled)
+      ansible.builtin.shell: grep -q "host.*mattermost.*mmuser.*0.0.0.0/0" /var/lib/pgsql/data/pg_hba.conf
+      register: remote_check
+      changed_when: false
+      failed_when: remote_check.rc != 0
+      when: postgresql_allow_remote | default(true)

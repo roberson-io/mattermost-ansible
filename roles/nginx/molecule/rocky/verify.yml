@@ -1,0 +1,50 @@
+---
+- name: Verify
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: Check nginx is installed
+      ansible.builtin.package:
+        name: nginx
+        state: present
+      check_mode: true
+      register: pkg_check
+      failed_when: pkg_check is changed
+
+    - name: Check nginx service is enabled
+      ansible.builtin.systemd:
+        name: nginx
+        enabled: true
+      check_mode: true
+      register: svc_enabled
+      failed_when: svc_enabled is changed
+
+    - name: Verify nginx config uses conf.d structure (RedHat)
+      ansible.builtin.stat:
+        path: /etc/nginx/conf.d/mattermost.conf
+      register: nginx_conf
+      failed_when: not nginx_conf.stat.exists
+
+    - name: Verify sites-enabled does NOT exist (RedHat uses conf.d)
+      ansible.builtin.stat:
+        path: /etc/nginx/sites-enabled/mattermost
+      register: sites_enabled
+      failed_when: sites_enabled.stat.exists
+
+    - name: Verify default.conf was removed
+      ansible.builtin.stat:
+        path: /etc/nginx/conf.d/default.conf
+      register: default_conf
+      failed_when: default_conf.stat.exists
+
+    - name: Verify nginx config file contains upstream definition
+      ansible.builtin.command: grep -q "upstream mattermost" /etc/nginx/conf.d/mattermost.conf
+      changed_when: false
+      register: upstream_check
+      failed_when: upstream_check.rc != 0
+
+    - name: Verify nginx config file contains proxy settings
+      ansible.builtin.command: grep -q "proxy_pass http://mattermost" /etc/nginx/conf.d/mattermost.conf
+      changed_when: false
+      register: proxy_check
+      failed_when: proxy_check.rc != 0

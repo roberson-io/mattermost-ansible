@@ -1,0 +1,110 @@
+---
+- name: Include OS-specific variables
+  ansible.builtin.include_vars: "{{ ansible_os_family }}.yml"
+- name: Update apt cache (Debian/Ubuntu)
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_os_family == "Debian"
+
+- name: Install nginx
+  ansible.builtin.package:
+    name: "{{ nginx_package }}"
+    state: present
+
+- name: Remove default nginx site
+  ansible.builtin.file:
+    path: "{{ nginx_default_site }}"
+    state: absent
+  notify: Reload nginx
+
+- name: Create nginx configuration for Mattermost (Debian/Ubuntu - sites-available)
+  ansible.builtin.template:
+    src: mattermost.conf.j2
+    dest: "{{ nginx_sites_available }}/mattermost"
+    mode: "0644"
+  notify: Reload nginx
+  when: ansible_os_family == "Debian"
+
+- name: Enable Mattermost nginx site (Debian/Ubuntu - sites-enabled symlink)
+  ansible.builtin.file:
+    src: "{{ nginx_sites_available }}/mattermost"
+    dest: "{{ nginx_sites_enabled }}/mattermost"
+    state: link
+  notify: Reload nginx
+  when: ansible_os_family == "Debian"
+
+- name: Create nginx configuration for Mattermost (RedHat - conf.d)
+  ansible.builtin.template:
+    src: mattermost.conf.j2
+    dest: "{{ nginx_conf_d }}/mattermost.conf"
+    mode: "0644"
+  notify: Reload nginx
+  when: ansible_os_family == "RedHat"
+
+- name: Check if ufw is available (Debian/Ubuntu)
+  ansible.builtin.command: which ufw
+  register: nginx_ufw_check
+  changed_when: false
+  failed_when: false
+  when: ansible_os_family == "Debian"
+
+- name: Allow HTTP through firewall (ufw - Debian/Ubuntu)
+  community.general.ufw:
+    rule: allow
+    port: "80"
+    proto: tcp
+  when:
+    - ansible_os_family == "Debian"
+    - nginx_ufw_check.rc == 0
+
+- name: Allow HTTPS through firewall (ufw - Debian/Ubuntu)
+  community.general.ufw:
+    rule: allow
+    port: "443"
+    proto: tcp
+  when:
+    - ansible_os_family == "Debian"
+    - nginx_ssl_enabled
+    - nginx_ufw_check.rc == 0
+
+- name: Check if firewalld is available (RedHat)
+  ansible.builtin.command: which firewall-cmd
+  register: nginx_firewalld_check
+  changed_when: false
+  failed_when: false
+  when: ansible_os_family == "RedHat"
+
+- name: Allow HTTP through firewall (firewalld - RedHat)
+  ansible.posix.firewalld:
+    service: http
+    permanent: true
+    state: enabled
+    immediate: true
+  when:
+    - ansible_os_family == "RedHat"
+    - nginx_firewalld_check.rc == 0
+
+- name: Allow HTTPS through firewall (firewalld - RedHat)
+  ansible.posix.firewalld:
+    service: https
+    permanent: true
+    state: enabled
+    immediate: true
+  when:
+    - ansible_os_family == "RedHat"
+    - nginx_ssl_enabled
+    - nginx_firewalld_check.rc == 0
+
+- name: Enable nginx
+  ansible.builtin.systemd:
+    name: "{{ nginx_service_name }}"
+    enabled: true
+
+- name: Start nginx
+  ansible.builtin.systemd:
+    name: "{{ nginx_service_name }}"
+    state: started
+  register: nginx_start
+  failed_when: false
+  changed_when: nginx_start is changed

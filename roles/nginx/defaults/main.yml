@@ -1,0 +1,13 @@
+---
+# Nginx role default variables
+nginx_server_name: mattermost.example.com
+nginx_upstream_host: localhost
+nginx_upstream_port: 8065
+
+# SSL/TLS configuration (paths will be set by certbot)
+nginx_ssl_enabled: true
+nginx_ssl_cert_path: "/etc/letsencrypt/live/{{ nginx_server_name }}/fullchain.pem"
+nginx_ssl_key_path: "/etc/letsencrypt/live/{{ nginx_server_name }}/privkey.pem"
+
+# HTTP to HTTPS redirect
+nginx_force_https: true

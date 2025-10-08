@@ -1,0 +1,32 @@
+---
+- name: Prepare
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Install firewalld and python-firewall for testing
+      ansible.builtin.package:
+        name:
+          - firewalld
+          - python3-firewall
+        state: present
+
+    - name: Start firewalld service
+      ansible.builtin.systemd:
+        name: firewalld
+        state: started
+        enabled: true
+
+    - name: Start a dummy backend service on port 8065 for nginx to proxy to
+      ansible.builtin.shell: |
+        nohup python3 -m http.server 8065 > /dev/null 2>&1 &
+        sleep 2
+      args:
+        creates: /tmp/dummy_backend_started
+      changed_when: false
+
+    - name: Mark dummy backend as started
+      ansible.builtin.file:
+        path: /tmp/dummy_backend_started
+        state: touch
+        mode: "0644"

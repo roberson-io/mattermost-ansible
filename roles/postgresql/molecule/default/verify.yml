@@ -1,0 +1,46 @@
+---
+- name: Verify
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Check PostgreSQL is installed
+      ansible.builtin.package:
+        name: postgresql
+        state: present
+      check_mode: true
+      register: pkg_check
+      failed_when: pkg_check is changed
+
+    - name: Check PostgreSQL service is running
+      ansible.builtin.service:
+        name: postgresql
+        state: started
+      check_mode: true
+      register: svc_check
+      failed_when: svc_check is changed
+
+    - name: Verify database exists
+      become: true
+      become_user: postgres
+      ansible.builtin.command: psql -lqt
+      register: db_list
+      changed_when: false
+      failed_when: "'mattermost' not in db_list.stdout"
+
+    - name: Verify database user exists
+      become: true
+      become_user: postgres
+      ansible.builtin.command: psql -t -c "SELECT 1 FROM pg_roles WHERE rolname='mmuser'"
+      register: user_check
+      changed_when: false
+      failed_when: "'1' not in user_check.stdout"
+
+    - name: Verify user has schema privileges
+      become: true
+      become_user: postgres
+      ansible.builtin.command: >
+        psql -d mattermost -t -c
+        "SELECT has_schema_privilege('mmuser', 'public', 'CREATE')"
+      register: priv_check
+      changed_when: false
+      failed_when: "'t' not in priv_check.stdout"

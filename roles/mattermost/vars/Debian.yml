@@ -1,0 +1,7 @@
+---
+# Debian/Ubuntu-specific variables
+mattermost_packages:
+  - curl
+  - tar
+
+mattermost_firewall_package: ufw

@@ -2,10 +2,20 @@
 *.retry
 .vault_password
 
+# Inventory files (keep .example templates)
+inventory/*.ini
+!inventory/*.ini.example
+
 # Python
 *.pyc
 __pycache__/
 .Python
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
 
 # Environment files
 .env
@@ -27,3 +37,8 @@ Thumbs.db
 
 # Vagrant
 .vagrant/
+
+# Molecule
+.molecule/
+.cache/
+molecule/**/__pycache__/

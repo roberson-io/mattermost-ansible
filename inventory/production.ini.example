@@ -1,0 +1,15 @@
+[database]
+# Replace with your production database server
+db.example.com ansible_user=ubuntu
+
+[app]
+# Replace with your production app server
+app.example.com ansible_user=ubuntu
+
+[mattermost:children]
+database
+app
+
+[mattermost:vars]
+ansible_python_interpreter=/usr/bin/python3
+environment=production

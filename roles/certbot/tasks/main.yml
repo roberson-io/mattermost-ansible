@@ -1,0 +1,55 @@
+---
+- name: Include OS-specific variables
+  ansible.builtin.include_vars: "{{ ansible_os_family }}.yml"
+- name: Update apt cache (Debian/Ubuntu)
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_os_family == "Debian"
+
+- name: Install EPEL repository (RedHat)
+  ansible.builtin.package:
+    name: epel-release
+    state: present
+  when: ansible_os_family == "RedHat" and certbot_needs_epel | default(false)
+
+- name: Install certbot and nginx plugin
+  ansible.builtin.package:
+    name: "{{ certbot_packages }}"
+    state: present
+
+- name: Check if certificate already exists
+  ansible.builtin.stat:
+    path: "/etc/letsencrypt/live/{{ certbot_domain }}/fullchain.pem"
+  register: certbot_letsencrypt_cert
+
+- name: Stop nginx temporarily for certificate generation
+  ansible.builtin.systemd:
+    name: nginx
+    state: stopped
+  when: not certbot_letsencrypt_cert.stat.exists and certbot_create_if_missing
+
+- name: Generate Let's Encrypt certificate
+  ansible.builtin.command: >
+    certbot certonly --standalone
+    --non-interactive
+    --agree-tos
+    --email {{ certbot_email }}
+    -d {{ certbot_domain }}
+  when: not certbot_letsencrypt_cert.stat.exists and certbot_create_if_missing
+  changed_when: true
+  notify: Restart nginx
+
+- name: Start nginx after certificate generation
+  ansible.builtin.systemd:
+    name: nginx
+    state: started
+  when: not certbot_letsencrypt_cert.stat.exists and certbot_create_if_missing
+
+- name: Set up automatic certificate renewal
+  ansible.builtin.cron:
+    name: "Renew Let's Encrypt certificates"
+    minute: "0"
+    hour: "3"
+    job: "certbot renew --quiet --post-hook 'systemctl reload nginx'"
+    state: present

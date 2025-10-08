@@ -1,0 +1,8 @@
+---
+# RedHat/CentOS/Rocky/Oracle Linux-specific variables
+nginx_package: nginx
+nginx_service_name: nginx
+nginx_config_dir: /etc/nginx
+nginx_conf_d: /etc/nginx/conf.d
+nginx_default_site: /etc/nginx/conf.d/default.conf
+nginx_use_sites_enabled: false
