@@ -17,6 +17,11 @@ mattermost_db_name: mattermost
 mattermost_db_user: mmuser
 mattermost_db_password: "mmuser_password_change_me"
 
+# License configuration (optional)
+# Uncomment and set path to your license file to activate Enterprise features
+mattermost_license_file: "license.mattermost"
+mattermost_service_environment: "test"  # Options: test, production, or dev
+
 # No nginx/TLS for local development
 use_nginx: false
 use_tls: false

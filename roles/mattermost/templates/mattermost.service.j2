@@ -13,6 +13,7 @@ WorkingDirectory={{ mattermost_install_path }}
 User=mattermost
 Group=mattermost
 LimitNOFILE=49152
+Environment="MM_SERVICEENVIRONMENT={{ mattermost_service_environment }}"
 
 [Install]
 WantedBy=multi-user.target

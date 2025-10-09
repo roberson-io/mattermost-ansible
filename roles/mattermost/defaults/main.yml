@@ -13,3 +13,7 @@ mattermost_db_password: "mmuser_password_change_me"
 # Site configuration
 mattermost_site_url: "http://{{ ansible_default_ipv4.address }}:8065"
 mattermost_listen_address: ":8065"
+
+# License configuration (optional)
+mattermost_license_file: ""  # Path to license file (e.g., license.mattermost)
+mattermost_service_environment: "production"  # Required: production, test, or dev

@@ -43,3 +43,9 @@
         path: /opt/mattermost
       register: mm_dir
       failed_when: mm_dir.stat.pw_name != 'mattermost'
+
+    - name: Verify MM_SERVICEENVIRONMENT is set in systemd service
+      ansible.builtin.command: grep "MM_SERVICEENVIRONMENT" /etc/systemd/system/mattermost.service
+      changed_when: false
+      register: service_env
+      failed_when: service_env.rc != 0

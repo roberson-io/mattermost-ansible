@@ -80,6 +80,13 @@
     regexp: '"SiteURL":\s*"[^"]*"'
     replace: '"SiteURL": "{{ mattermost_site_url }}"'
 
+- name: Enable local mode for mmctl
+  ansible.builtin.replace:
+    path: "{{ mattermost_install_path }}/config/config.json"
+    regexp: '"EnableLocalMode":\s*(true|false)'
+    replace: '"EnableLocalMode": true'
+  notify: Restart mattermost
+
 - name: Create Mattermost systemd service
   ansible.builtin.template:
     src: mattermost.service.j2
@@ -134,3 +141,59 @@
   when:
     - ansible_os_family == "RedHat"
     - mattermost_firewalld_check.rc == 0
+
+# License activation (optional)
+- name: Flush handlers to ensure Mattermost is restarted with local mode enabled
+  ansible.builtin.meta: flush_handlers
+
+- name: Wait for Mattermost to be ready
+  ansible.builtin.uri:
+    url: "{{ mattermost_site_url }}/api/v4/system/ping"
+    status_code: 200
+  register: mattermost_ping
+  until: mattermost_ping.status == 200
+  retries: 30
+  delay: 2
+  when: mattermost_license_file | length > 0
+
+- name: Copy license file to server
+  ansible.builtin.copy:
+    src: "{{ mattermost_license_file }}"
+    dest: "/tmp/mattermost.license"
+    owner: mattermost
+    group: mattermost
+    mode: "0600"
+  when: mattermost_license_file | length > 0
+
+- name: Upload license using mmctl
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl
+      --local license upload /tmp/mattermost.license
+  become: true
+  become_user: mattermost
+  register: mattermost_license_upload
+  changed_when: "'License uploaded successfully' in mattermost_license_upload.stdout or mattermost_license_upload.rc == 0"
+  failed_when: false
+  when: mattermost_license_file | length > 0
+
+- name: Remove temporary license file
+  ansible.builtin.file:
+    path: "/tmp/mattermost.license"
+    state: absent
+  when: mattermost_license_file | length > 0
+
+- name: Get license status
+  ansible.builtin.command:
+    cmd: "{{ mattermost_install_path }}/bin/mmctl --local system status"
+  become: true
+  become_user: mattermost
+  register: mattermost_license_status
+  changed_when: false
+  failed_when: false
+  when: mattermost_license_file | length > 0
+
+- name: Display license information
+  ansible.builtin.debug:
+    msg: "License upload result: {{ mattermost_license_upload.stdout | default('No license uploaded') }}"
+  when: mattermost_license_file | length > 0

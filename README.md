@@ -69,7 +69,7 @@ Role-based Ansible playbooks to deploy Mattermost for both local development and
 │   ├── production.ini.example    # Production server inventory template
 │   └── *.ini                     # Your custom inventory files (gitignored)
 ├── group_vars/
-│   ├── local.yml                 # Local environment variables
+│   ├── mattermost.yml            # Local environment variables
 │   └── production.yml            # Production environment variables
 └── roles/
     ├── postgresql/               # Database setup
@@ -220,11 +220,30 @@ Manages Let's Encrypt certificates with:
 
 ## Customization
 
-Edit variables in `group_vars/{environment}.yml`:
+Edit variables in `group_vars/mattermost.yml` (for local) or `group_vars/production.yml`:
 - `mattermost_version`: Version to install
 - `mattermost_db_password`: Database password
-- `nginx_server_name`: Your domain name
-- `certbot_email`: Email for Let's Encrypt notifications
+- `nginx_server_name`: Your domain name (production only)
+- `certbot_email`: Email for Let's Encrypt notifications (production only)
+
+### Enterprise License Configuration
+
+To activate a Mattermost Enterprise license:
+
+1. Place your license file (e.g., `license.mattermost`) in the project root directory
+2. Edit `group_vars/mattermost.yml` or `group_vars/production.yml`:
+   ```yaml
+   mattermost_license_file: "license.mattermost"
+   mattermost_service_environment: "test"  # Options: test, production, or dev
+   ```
+3. Run the deployment playbook
+
+The playbook will automatically:
+- Copy the license file to the server
+- Upload it using `mmctl`
+- Activate Enterprise features
+
+**Note**: The `MM_SERVICEENVIRONMENT` variable must match your license requirements. Check your license agreement for the correct value.
 
 ## Security Notes
 

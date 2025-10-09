@@ -42,3 +42,6 @@ Thumbs.db
 .molecule/
 .cache/
 molecule/**/__pycache__/
+
+# Mattermost
+license.mattermost
