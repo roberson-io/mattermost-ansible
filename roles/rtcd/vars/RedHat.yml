@@ -1,0 +1,5 @@
+---
+# RedHat/Rocky/CentOS specific variables
+rtcd_required_packages:
+  - ca-certificates
+  - curl

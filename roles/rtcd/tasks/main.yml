@@ -1,0 +1,162 @@
+---
+# rtcd role main tasks
+
+- name: Include OS-specific variables
+  ansible.builtin.include_vars: "{{ ansible_os_family }}.yml"
+
+- name: Update apt cache (Debian/Ubuntu)
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_os_family == "Debian"
+
+- name: Install required packages
+  ansible.builtin.package:
+    name: "{{ rtcd_required_packages }}"
+    state: present
+
+- name: Create rtcd group
+  ansible.builtin.group:
+    name: "{{ rtcd_group }}"
+    system: true
+    state: present
+
+- name: Create rtcd user
+  ansible.builtin.user:
+    name: "{{ rtcd_user }}"
+    group: "{{ rtcd_group }}"
+    system: true
+    create_home: false
+    shell: /usr/sbin/nologin
+    state: present
+
+- name: Create rtcd directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ rtcd_user }}"
+    group: "{{ rtcd_group }}"
+    mode: "0755"
+  loop:
+    - "{{ rtcd_install_path }}"
+    - "{{ rtcd_install_path }}/bin"
+    - "{{ rtcd_config_path }}"
+    - "{{ rtcd_data_path }}"
+
+- name: Check if rtcd binary exists
+  ansible.builtin.stat:
+    path: "{{ rtcd_install_path }}/bin/rtcd"
+  register: rtcd_binary
+
+- name: Download rtcd binary
+  ansible.builtin.get_url:
+    url: "{{ rtcd_download_url }}"
+    dest: "{{ rtcd_install_path }}/bin/rtcd"
+    mode: "0755"
+    owner: "{{ rtcd_user }}"
+    group: "{{ rtcd_group }}"
+  when: not rtcd_binary.stat.exists
+  notify: Restart rtcd
+
+- name: Deploy rtcd configuration
+  ansible.builtin.template:
+    src: config.toml.j2
+    dest: "{{ rtcd_config_path }}/config.toml"
+    owner: "{{ rtcd_user }}"
+    group: "{{ rtcd_group }}"
+    mode: "0644"
+  notify: Restart rtcd
+
+- name: Deploy rtcd systemd service
+  ansible.builtin.template:
+    src: rtcd.service.j2
+    dest: /etc/systemd/system/rtcd.service
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart rtcd
+
+- name: Enable rtcd service
+  ansible.builtin.systemd:
+    name: rtcd
+    enabled: true
+    daemon_reload: true
+
+- name: Start rtcd service
+  ansible.builtin.systemd:
+    name: rtcd
+    state: started
+  register: rtcd_start
+  failed_when: false
+
+# Firewall configuration
+- name: Check if ufw is available (Debian/Ubuntu)
+  ansible.builtin.command: which ufw
+  register: rtcd_ufw_check
+  changed_when: false
+  failed_when: false
+  when: ansible_os_family == "Debian"
+
+- name: Allow rtcd API port through firewall (ufw - Debian/Ubuntu)
+  community.general.ufw:
+    rule: allow
+    port: "{{ rtcd_api_listen_address.split(':')[1] }}"
+    proto: tcp
+  when:
+    - ansible_os_family == "Debian"
+    - rtcd_ufw_check.rc == 0
+
+- name: Allow rtcd media UDP port through firewall (ufw - Debian/Ubuntu)
+  community.general.ufw:
+    rule: allow
+    port: "{{ rtcd_ice_port_udp }}"
+    proto: udp
+  when:
+    - ansible_os_family == "Debian"
+    - rtcd_ufw_check.rc == 0
+
+- name: Allow rtcd media TCP port through firewall (ufw - Debian/Ubuntu)
+  community.general.ufw:
+    rule: allow
+    port: "{{ rtcd_ice_port_tcp }}"
+    proto: tcp
+  when:
+    - ansible_os_family == "Debian"
+    - rtcd_ufw_check.rc == 0
+
+- name: Check if firewalld is available (RedHat)
+  ansible.builtin.command: which firewall-cmd
+  register: rtcd_firewalld_check
+  changed_when: false
+  failed_when: false
+  when: ansible_os_family == "RedHat"
+
+- name: Allow rtcd API port through firewall (firewalld - RedHat)
+  ansible.posix.firewalld:
+    port: "{{ rtcd_api_listen_address.split(':')[1] }}/tcp"
+    permanent: true
+    state: enabled
+    immediate: true
+  when:
+    - ansible_os_family == "RedHat"
+    - rtcd_firewalld_check.rc == 0
+
+- name: Allow rtcd media UDP port through firewall (firewalld - RedHat)
+  ansible.posix.firewalld:
+    port: "{{ rtcd_ice_port_udp }}/udp"
+    permanent: true
+    state: enabled
+    immediate: true
+  when:
+    - ansible_os_family == "RedHat"
+    - rtcd_firewalld_check.rc == 0
+
+- name: Allow rtcd media TCP port through firewall (firewalld - RedHat)
+  ansible.posix.firewalld:
+    port: "{{ rtcd_ice_port_tcp }}/tcp"
+    permanent: true
+    state: enabled
+    immediate: true
+  when:
+    - ansible_os_family == "RedHat"
+    - rtcd_firewalld_check.rc == 0

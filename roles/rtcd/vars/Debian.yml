@@ -1,0 +1,5 @@
+---
+# Debian/Ubuntu specific variables
+rtcd_required_packages:
+  - ca-certificates
+  - curl

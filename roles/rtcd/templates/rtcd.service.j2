@@ -1,0 +1,16 @@
+[Unit]
+Description=Mattermost RTCD Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart={{ rtcd_install_path }}/bin/rtcd --config {{ rtcd_config_path }}/config.toml
+WorkingDirectory={{ rtcd_install_path }}
+User={{ rtcd_user }}
+Group={{ rtcd_group }}
+Restart=always
+RestartSec=10
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

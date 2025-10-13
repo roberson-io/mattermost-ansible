@@ -4,6 +4,15 @@
 #   Local:      ansible-playbook -i inventory/local.ini site.yml
 #   Production: ansible-playbook -i inventory/production.ini site.yml
 
+- name: Bootstrap Python dependencies
+  hosts: all
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Install Python SELinux support (RedHat/Rocky)
+      ansible.builtin.raw: test -f /usr/bin/dnf && dnf install -y python3-libselinux || true
+      changed_when: false
+
 - name: Gather facts from all hosts
   hosts: all
   gather_facts: true
@@ -46,12 +55,41 @@
     - name: Set site URL from facts
       ansible.builtin.set_fact:
         mattermost_site_url: "http://{{ ansible_default_ipv4.address }}:8065"
+
+    - name: Gather facts from rtcd host
+      ansible.builtin.setup:
+      delegate_to: "{{ item }}"
+      delegate_facts: true
+      loop: "{{ groups.get('rtcd', []) }}"
+      when:
+        - enable_calls | default(false)
+        - groups.get('rtcd', []) | length > 0
+
+    - name: Set rtcd host from facts
+      ansible.builtin.set_fact:
+        mattermost_rtcd_host: "{{ hostvars[groups['rtcd'][0]]['ansible_default_ipv4']['address'] }}"
+      when:
+        - enable_calls | default(false)
+        - groups.get('rtcd', []) | length > 0
   roles:
     - mattermost
     - role: nginx
       when: use_nginx | default(false)
     - role: certbot
       when: use_tls | default(false)
+
+- name: Deploy RTCD Service
+  hosts: rtcd
+  become: true
+  gather_facts: true
+  pre_tasks:
+    - name: Install Python SELinux support (RedHat/Rocky)
+      ansible.builtin.raw: dnf install -y python3-libselinux
+      when: ansible_os_family == "RedHat"
+      changed_when: false
+  roles:
+    - role: rtcd
+      when: enable_calls | default(false)
 
 - name: Display deployment information
   hosts: app
@@ -63,4 +101,8 @@
         msg:
           - "Mattermost deployment complete!"
           - "Access URL: {{ mattermost_site_url | default('http://localhost:8065') }}"
+          - >-
+            RTCD URL: {{ 'http://' + mattermost_rtcd_host + ':8045'
+            if (enable_calls | default(false) and mattermost_rtcd_host is defined)
+            else 'Not configured' }}
           - "Create your admin account on first visit"

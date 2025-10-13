@@ -24,9 +24,15 @@ YOUR_USER@YOUR_DB_HOST
 # Example: your_user@mattermost@orb
 YOUR_USER@YOUR_APP_HOST
 
+[rtcd]
+# Optional: Enable Mattermost Calls by uncommenting and configuring
+# Example: your_user@rtcd@orb
+# YOUR_USER@YOUR_RTCD_HOST
+
 [mattermost:children]
 database
 app
+rtcd
 
 [mattermost:vars]
 ansible_python_interpreter=/usr/bin/python3

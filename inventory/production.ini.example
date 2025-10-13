@@ -6,9 +6,14 @@ db.example.com ansible_user=ubuntu
 # Replace with your production app server
 app.example.com ansible_user=ubuntu
 
+[rtcd]
+# Optional: Enable Mattermost Calls by uncommenting and configuring
+# rtcd.example.com ansible_user=ubuntu
+
 [mattermost:children]
 database
 app
+rtcd
 
 [mattermost:vars]
 ansible_python_interpreter=/usr/bin/python3

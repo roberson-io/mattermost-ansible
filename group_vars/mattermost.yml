@@ -22,6 +22,14 @@ mattermost_db_password: "mmuser_password_change_me"
 mattermost_license_file: "license.mattermost"
 mattermost_service_environment: "test"  # Options: test, production, or dev
 
+# Mattermost Calls configuration (optional)
+# Enable Calls by setting enable_calls to true and configuring an rtcd host in inventory
+enable_calls: true
+# rtcd_version: "v1.2.1"
+# rtcd_api_listen_address: "0.0.0.0:8045"
+# rtcd_ice_port_udp: 8443
+# rtcd_ice_port_tcp: 8443
+
 # No nginx/TLS for local development
 use_nginx: false
 use_tls: false

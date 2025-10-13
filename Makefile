@@ -1,4 +1,4 @@
-.PHONY: help ci clean clean-all deploy-local deploy-local-check deploy-production deploy-production-check install lint lint-fix ping-local ping-production safety-check setup syntax-check test test-all test-certbot test-mattermost test-mattermost-rocky test-nginx test-nginx-rocky test-postgresql test-postgresql-rocky test-rocky test-ubuntu
+.PHONY: help ci clean clean-all deploy-local deploy-local-check deploy-production deploy-production-check install lint lint-fix ping-local ping-production safety-check setup syntax-check test test-all test-certbot test-mattermost test-mattermost-calls test-mattermost-rocky test-nginx test-nginx-rocky test-postgresql test-postgresql-rocky test-rocky test-rtcd test-ubuntu
 
 # Default target
 .DEFAULT_GOAL := help
@@ -25,6 +25,7 @@ clean: ## Clean up test artifacts and containers
 	@$(VENV_ACTIVATE) && cd roles/mattermost && molecule destroy --all || true
 	@$(VENV_ACTIVATE) && cd roles/nginx && molecule destroy --all || true
 	@$(VENV_ACTIVATE) && cd roles/certbot && molecule destroy --all || true
+	@$(VENV_ACTIVATE) && cd roles/rtcd && molecule destroy --all || true
 	@find . -type d -name ".molecule" -exec rm -rf {} + 2>/dev/null || true
 	@find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	@find . -type f -name "*.pyc" -delete
@@ -110,6 +111,10 @@ test-mattermost: ## Test mattermost role (Ubuntu - default scenario)
 	@echo "Testing mattermost role (Ubuntu)..."
 	@$(VENV_ACTIVATE) && cd roles/mattermost && molecule test -s default
 
+test-mattermost-calls: ## Test mattermost role with Calls/rtcd configuration
+	@echo "Testing mattermost role with Calls enabled..."
+	@$(VENV_ACTIVATE) && cd roles/mattermost && molecule test -s with-calls
+
 test-mattermost-rocky: ## Test mattermost role (Rocky Linux)
 	@echo "Testing mattermost role (Rocky Linux)..."
 	@$(VENV_ACTIVATE) && cd roles/mattermost && molecule test -s rocky
@@ -133,5 +138,9 @@ test-postgresql-rocky: ## Test postgresql role (Rocky Linux)
 test-rocky: test-postgresql-rocky test-mattermost-rocky test-nginx-rocky ## Run all Rocky Linux tests
 	@echo "✓ All Rocky Linux tests completed"
 
-test-ubuntu: test-postgresql test-mattermost test-nginx ## Run all Ubuntu tests (default scenarios)
+test-rtcd: ## Test rtcd role (Ubuntu - default scenario)
+	@echo "Testing rtcd role (Ubuntu)..."
+	@$(VENV_ACTIVATE) && cd roles/rtcd && molecule test -s default
+
+test-ubuntu: test-postgresql test-mattermost test-mattermost-calls test-nginx test-rtcd ## Run all Ubuntu tests (default scenarios)
 	@echo "✓ All Ubuntu tests completed"

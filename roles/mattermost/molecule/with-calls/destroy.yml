@@ -1,0 +1,25 @@
+---
+- name: Destroy
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Destroy docker containers
+      community.docker.docker_container:
+        name: "{{ item.name }}"
+        state: absent
+      with_items: "{{ molecule_yml.platforms }}"
+      register: server
+
+    - name: Populate instance config
+      ansible.builtin.set_fact:
+        instance_conf: {}
+
+    - name: Dump instance config  # noqa: no-handler
+      ansible.builtin.copy:
+        content: |
+          # Molecule managed
+          {{ instance_conf | to_json | from_json | to_yaml }}
+        dest: "{{ molecule_instance_config }}"
+        mode: "0600"
+      when: server.changed | default(false) | bool

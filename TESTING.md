@@ -2,13 +2,37 @@
 
 This project uses Molecule for testing Ansible roles with Docker containers.
 
+## Quick Start
+
+Run all tests (Ubuntu + Rocky Linux):
+```bash
+make test-all
+```
+
+Run Ubuntu tests only:
+```bash
+make test  # or make test-ubuntu
+```
+
+Run individual role tests:
+```bash
+make test-postgresql        # PostgreSQL role (Ubuntu)
+make test-mattermost        # Mattermost role (Ubuntu)
+make test-mattermost-calls  # Mattermost with Calls configuration (Ubuntu)
+make test-nginx             # Nginx role (Ubuntu)
+make test-rtcd              # RTCD service role (Ubuntu)
+make test-certbot           # Certbot role (Ubuntu)
+```
+
 ## Test Status
 
-| Role | Status | Notes |
-|------|--------|-------|
-| postgresql | ✅ **PASSING** | Full test coverage including idempotence |
-| mattermost | ⚠️  **PARTIAL** | Installation verified, service start skipped (integration test) |
-| nginx | ⚠️  **PARTIAL** | Configuration verified, requires backend for full test |
+| Role | Scenarios | Status | Notes |
+|------|-----------|--------|-------|
+| postgresql | default (Ubuntu), rocky (Rocky Linux) | ✅ **PASSING** | Full test coverage including idempotence |
+| mattermost | default (Ubuntu), rocky (Rocky Linux), with-calls (Ubuntu) | ✅ **PASSING** | Installation, configuration, license, and Calls integration |
+| nginx | default (Ubuntu), rocky (Rocky Linux) | ✅ **PASSING** | Configuration and service setup |
+| rtcd | default (Ubuntu) | ✅ **PASSING** | Service installation, firewall, and configuration |
+| certbot | default (Ubuntu) | ✅ **PASSING** | Certificate management |
 
 ## Prerequisites
 
@@ -69,26 +93,44 @@ Tests verify:
 
 ## Running Tests
 
-### Test Individual Roles
+### Using Makefile (Recommended)
 
-Each role has its own Molecule test scenario in `roles/<role_name>/molecule/default/`.
+The project includes a Makefile with convenient test targets:
 
-**Test PostgreSQL role:**
+**Run all tests:**
 ```bash
-cd roles/postgresql
-molecule test
+make test-all  # Ubuntu + Rocky + certbot
 ```
 
-**Test Mattermost role:**
+**Run platform-specific tests:**
+```bash
+make test-ubuntu  # All Ubuntu-based tests
+make test-rocky   # All Rocky Linux tests
+```
+
+**Run individual role tests:**
+```bash
+make test-postgresql          # PostgreSQL (Ubuntu)
+make test-postgresql-rocky    # PostgreSQL (Rocky Linux)
+make test-mattermost          # Mattermost (Ubuntu)
+make test-mattermost-calls    # Mattermost with Calls (Ubuntu)
+make test-mattermost-rocky    # Mattermost (Rocky Linux)
+make test-nginx               # Nginx (Ubuntu)
+make test-nginx-rocky         # Nginx (Rocky Linux)
+make test-rtcd                # RTCD service (Ubuntu)
+make test-certbot             # Certbot (Ubuntu)
+```
+
+### Direct Molecule Commands
+
+Each role has its own Molecule test scenario in `roles/<role_name>/molecule/<scenario>/`.
+
+**Test specific scenario:**
 ```bash
 cd roles/mattermost
-molecule test
-```
-
-**Test Nginx role:**
-```bash
-cd roles/nginx
-molecule test
+molecule test -s default      # Ubuntu scenario
+molecule test -s rocky        # Rocky Linux scenario
+molecule test -s with-calls   # Calls configuration scenario
 ```
 
 ### Molecule Commands
@@ -167,6 +209,35 @@ The default test sequence is:
 - Nginx is installed and running
 - Mattermost configuration is created
 - Reverse proxy is configured correctly
+
+### RTCD Role Tests
+
+**Container**: Ubuntu 22.04 with Ansible pre-installed
+
+**Verifies**:
+- RTCD binary is downloaded and installed
+- rtcd user and directories are created
+- Configuration file is properly templated
+- Systemd service is configured and enabled
+- Firewall rules are applied (ufw/firewalld)
+
+### Mattermost with Calls Tests
+
+**Scenario**: `with-calls` in mattermost role
+
+**Containers**:
+- PostgreSQL 14 database
+- Ubuntu 22.04 application server
+
+**Configuration**:
+- `enable_calls: true`
+- `mattermost_rtcd_host: "192.168.1.100"`
+
+**Verifies**:
+- All standard Mattermost installation steps
+- RTCD service URL is configured in config.json at path:
+  `PluginSettings.Plugins.com.mattermost.calls.rtcdserviceurl`
+- Configuration is idempotent (no changes on subsequent runs)
 
 ## Continuous Integration
 

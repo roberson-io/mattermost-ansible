@@ -1,0 +1,61 @@
+---
+- name: Verify
+  hosts: rtcd
+  gather_facts: false
+  tasks:
+    - name: Check rtcd binary exists
+      ansible.builtin.stat:
+        path: /opt/rtcd/bin/rtcd
+      register: rtcd_bin
+      failed_when: not rtcd_bin.stat.exists
+
+    - name: Check rtcd binary is executable
+      ansible.builtin.stat:
+        path: /opt/rtcd/bin/rtcd
+      register: rtcd_bin_exec
+      failed_when: not rtcd_bin_exec.stat.executable
+
+    - name: Check rtcd user exists
+      ansible.builtin.getent:
+        database: passwd
+        key: rtcd
+      register: rtcd_user
+      failed_when: rtcd_user.failed
+
+    - name: Check rtcd service exists
+      ansible.builtin.stat:
+        path: /etc/systemd/system/rtcd.service
+      register: rtcd_service
+      failed_when: not rtcd_service.stat.exists
+
+    - name: Check rtcd service is enabled
+      ansible.builtin.systemd:
+        name: rtcd
+        enabled: true
+      check_mode: true
+      register: svc_enabled
+      failed_when: svc_enabled is changed
+
+    - name: Check rtcd configuration exists
+      ansible.builtin.stat:
+        path: /etc/rtcd/config.toml
+      register: rtcd_config
+      failed_when: not rtcd_config.stat.exists
+
+    - name: Verify rtcd configuration is valid TOML
+      ansible.builtin.command: grep -E "^\[api\.|^\[rtc\]|^\[store\]" /etc/rtcd/config.toml
+      changed_when: false
+      register: config_check
+      failed_when: config_check.rc != 0
+
+    - name: Verify rtcd data directory exists
+      ansible.builtin.stat:
+        path: /var/lib/rtcd
+      register: rtcd_data
+      failed_when: not rtcd_data.stat.exists
+
+    - name: Verify rtcd data directory ownership
+      ansible.builtin.stat:
+        path: /var/lib/rtcd
+      register: rtcd_dir
+      failed_when: rtcd_dir.stat.pw_name != 'rtcd'

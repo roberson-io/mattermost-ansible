@@ -1,0 +1,65 @@
+---
+- name: Verify
+  hosts: app
+  gather_facts: false
+  tasks:
+    - name: Check Mattermost binary exists
+      ansible.builtin.stat:
+        path: /opt/mattermost/bin/mattermost
+      register: mm_bin
+      failed_when: not mm_bin.stat.exists
+
+    - name: Check Mattermost user exists
+      ansible.builtin.getent:
+        database: passwd
+        key: mattermost
+      register: mm_user
+      failed_when: mm_user.failed
+
+    - name: Check Mattermost service exists
+      ansible.builtin.stat:
+        path: /etc/systemd/system/mattermost.service
+      register: mm_service
+      failed_when: not mm_service.stat.exists
+
+    - name: Check Mattermost service is enabled
+      ansible.builtin.systemd:
+        name: mattermost
+        enabled: true
+      check_mode: true
+      register: svc_enabled
+      failed_when: svc_enabled is changed
+
+    - name: Verify Mattermost config has correct database connection
+      ansible.builtin.command: grep -q "mattermost-db" /opt/mattermost/config/config.json
+      changed_when: false
+
+    - name: Verify Mattermost config has correct site URL
+      ansible.builtin.command: grep -q "http://localhost:8065" /opt/mattermost/config/config.json
+      changed_when: false
+
+    - name: Verify Mattermost directory ownership
+      ansible.builtin.stat:
+        path: /opt/mattermost
+      register: mm_dir
+      failed_when: mm_dir.stat.pw_name != 'mattermost'
+
+    - name: Verify MM_SERVICEENVIRONMENT is set in systemd service
+      ansible.builtin.command: grep "MM_SERVICEENVIRONMENT" /etc/systemd/system/mattermost.service
+      changed_when: false
+      register: service_env
+      failed_when: service_env.rc != 0
+
+    - name: Verify rtcd service URL is configured in config.json  # noqa: command-instead-of-shell
+      ansible.builtin.shell: >
+        jq -r '.PluginSettings.Plugins."com.mattermost.calls".rtcdserviceurl'
+        /opt/mattermost/config/config.json
+      changed_when: false
+      register: rtcd_url_check
+
+    - name: Assert rtcd URL is configured correctly
+      ansible.builtin.assert:
+        that:
+          - rtcd_url_check.stdout == "http://192.168.1.100:8045"
+        fail_msg: "rtcdserviceurl not configured correctly. Expected 'http://192.168.1.100:8045', got '{{ rtcd_url_check.stdout }}'"
+        success_msg: "rtcdserviceurl is properly configured"

@@ -9,6 +9,8 @@ Role-based Ansible playbooks to deploy Mattermost for both local development and
 - **Role-based architecture**: Modular, reusable components
 - **Production-ready**: Includes nginx reverse proxy and Let's Encrypt SSL/TLS
 - **Separate database tier**: PostgreSQL on dedicated host
+- **Optional Mattermost Calls**: Real-time voice/video with dedicated rtcd service
+- **Enterprise license support**: Automated license activation with mmctl
 
 ## Prerequisites
 
@@ -75,7 +77,8 @@ Role-based Ansible playbooks to deploy Mattermost for both local development and
     ├── postgresql/               # Database setup
     ├── mattermost/               # Mattermost application
     ├── nginx/                    # Reverse proxy (production)
-    └── certbot/                  # Let's Encrypt SSL (production)
+    ├── certbot/                  # Let's Encrypt SSL (production)
+    └── rtcd/                     # Real-time communication daemon (optional)
 ```
 
 ## Quick Start
@@ -244,6 +247,50 @@ The playbook will automatically:
 - Activate Enterprise features
 
 **Note**: The `MM_SERVICEENVIRONMENT` variable must match your license requirements. Check your license agreement for the correct value.
+
+### Mattermost Calls Configuration
+
+To enable voice and video calling with Mattermost Calls:
+
+1. **Add rtcd host to your inventory** (`inventory/local.ini` or `inventory/production.ini`):
+   ```ini
+   [rtcd]
+   username@rtcd@orb  # For local OrbStack
+   # OR
+   rtcd.example.com ansible_user=ubuntu  # For production
+   ```
+
+2. **Enable Calls** in `group_vars/mattermost.yml` or `group_vars/production.yml`:
+   ```yaml
+   enable_calls: true
+   ```
+
+3. **Optional: Customize rtcd settings**:
+   ```yaml
+   rtcd_version: "v1.2.1"
+   rtcd_api_listen_address: "0.0.0.0:8045"
+   rtcd_ice_port_udp: 8443
+   rtcd_ice_port_tcp: 8443
+   ```
+
+4. **Deploy or redeploy**:
+   ```bash
+   ansible-playbook -i inventory/local.ini site.yml
+   ```
+
+The playbook will:
+- Install rtcd service on the dedicated host
+- Configure firewall rules for API and media ports
+- Set up systemd service for rtcd
+- Display rtcd URL in deployment output
+
+**Notes:**
+- rtcd runs on a separate host from Mattermost for better performance and security
+- Default ports: 8045 (API), 8443 (UDP/TCP media)
+- STUN/TURN server configuration can be added later if needed for NAT traversal
+- For production, configure appropriate firewall rules to allow UDP/TCP traffic on media ports
+
+For more information, see [Mattermost Calls documentation](https://docs.mattermost.com/configure/calls-deployment.html).
 
 ## Security Notes
 

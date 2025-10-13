@@ -1,0 +1,49 @@
+---
+# rtcd role default variables
+
+# Version and installation
+rtcd_version: "v1.2.1"
+rtcd_download_url: "https://github.com/mattermost/rtcd/releases/download/{{ rtcd_version }}/rtcd-linux-amd64"
+rtcd_install_path: /opt/rtcd
+rtcd_config_path: /etc/rtcd
+rtcd_data_path: /var/lib/rtcd
+rtcd_user: rtcd
+rtcd_group: rtcd
+
+# API Configuration
+rtcd_api_listen_address: "0.0.0.0:8045"
+rtcd_api_tls_enable: false
+rtcd_api_tls_cert_file: ""
+rtcd_api_tls_cert_key: ""
+
+# Security Configuration
+rtcd_security_allow_self_registration: true
+rtcd_security_enable_admin: false
+rtcd_security_admin_secret_key: ""
+rtcd_security_session_cache_expiration_minutes: 1440
+
+# RTC Configuration
+rtcd_ice_port_udp: 8443
+rtcd_ice_port_tcp: 8443
+rtcd_ice_address_udp: ""
+rtcd_ice_address_tcp: ""
+rtcd_enable_ipv6: false
+rtcd_ice_host_override: ""
+
+# STUN/TURN servers (optional)
+rtcd_ice_servers: []
+# Example:
+# rtcd_ice_servers:
+#   - urls: ["stun:stun.example.com:3478"]
+#   - urls: ["turn:turn.example.com:3478"]
+#     username: "turnuser"
+#     credential: "turnpass"
+
+# Logger Configuration
+rtcd_logger_enable_console: true
+rtcd_logger_console_level: "INFO"
+rtcd_logger_console_json: false
+rtcd_logger_enable_file: true
+rtcd_logger_file_path: "{{ rtcd_data_path }}/rtcd.log"
+rtcd_logger_file_level: "DEBUG"
+rtcd_logger_file_json: true

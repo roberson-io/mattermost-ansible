@@ -3,5 +3,6 @@
 mattermost_packages:
   - curl
   - tar
+  - jq
 
 mattermost_firewall_package: firewalld

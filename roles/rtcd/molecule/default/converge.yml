@@ -1,0 +1,7 @@
+---
+- name: Converge
+  hosts: rtcd
+  become: true
+  gather_facts: true
+  roles:
+    - rtcd
