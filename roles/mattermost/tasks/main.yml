@@ -24,20 +24,146 @@
     path: "{{ mattermost_install_path }}/bin/mattermost"
   register: mattermost_binary
 
+- name: Get current Mattermost version
+  ansible.builtin.shell: "{{ mattermost_install_path }}/bin/mattermost version | grep '^Version:' | awk '{print $2}'"
+  register: mattermost_current_version
+  changed_when: false
+  failed_when: false
+  when: mattermost_binary.stat.exists
+
+- name: Set version comparison facts
+  ansible.builtin.set_fact:
+    mattermost_needs_install: "{{ not mattermost_binary.stat.exists }}"
+    mattermost_needs_upgrade: "{{ mattermost_binary.stat.exists and mattermost_current_version.stdout != mattermost_version }}"
+    mattermost_installed_version: "{{ mattermost_current_version.stdout | default('none') }}"
+
+- name: Display version information
+  ansible.builtin.debug:
+    msg:
+      - "Current version: {{ mattermost_installed_version }}"
+      - "Desired version: {{ mattermost_version }}"
+      - "Action needed: {{ 'fresh install' if mattermost_needs_install else ('upgrade/downgrade' if mattermost_needs_upgrade else 'none (already at desired version)') }}"
+
+- name: Stop Mattermost for upgrade/downgrade
+  ansible.builtin.systemd:
+    name: mattermost
+    state: stopped
+  when: mattermost_needs_upgrade
+
+- name: Ensure backup directory exists on database host
+  ansible.builtin.file:
+    path: "{{ mattermost_backup_dir }}"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: "0750"
+  delegate_to: "{{ groups['database'][0] }}"
+  become: true
+  when: mattermost_needs_upgrade
+
+- name: Backup database before upgrade/downgrade
+  community.postgresql.postgresql_db:
+    name: "{{ mattermost_db_name }}"
+    state: dump
+    target: "{{ mattermost_backup_dir }}/mattermost-db-backup-{{ ansible_date_time.iso8601_basic_short }}.sql"
+  delegate_to: "{{ groups['database'][0] }}"
+  become: true
+  become_user: postgres
+  register: mattermost_db_backup
+  when: mattermost_needs_upgrade
+
+- name: Backup Mattermost application directory (following official naming convention)
+  ansible.builtin.copy:
+    src: "{{ mattermost_install_path }}/"
+    dest: "{{ mattermost_install_path }}-back-{{ ansible_date_time.date }}-{{ ansible_date_time.hour }}-{{ ansible_date_time.minute }}"
+    remote_src: true
+    owner: mattermost
+    group: mattermost
+  register: mattermost_app_backup
+  when: mattermost_needs_upgrade
+
+- name: Remove old Mattermost tarball for upgrade/downgrade
+  ansible.builtin.file:
+    path: /tmp/mattermost.tar.gz
+    state: absent
+  when: mattermost_needs_upgrade
+
 - name: Download Mattermost
   ansible.builtin.get_url:
     url: "https://releases.mattermost.com/{{ mattermost_version }}/mattermost-{{ mattermost_version }}-linux-amd64.tar.gz"
     dest: /tmp/mattermost.tar.gz
     mode: "0644"
-  when: not mattermost_binary.stat.exists
+    force: true
+    timeout: 300
+  when: mattermost_needs_install or mattermost_needs_upgrade
 
-- name: Extract Mattermost
+- name: Extract Mattermost (fresh install)
   ansible.builtin.unarchive:
     src: /tmp/mattermost.tar.gz
     dest: /opt
     remote_src: true
     creates: "{{ mattermost_install_path }}"
-  when: not mattermost_binary.stat.exists
+  when: mattermost_needs_install
+
+- name: Extract new Mattermost version to temporary location
+  ansible.builtin.unarchive:
+    src: /tmp/mattermost.tar.gz
+    dest: /tmp
+    remote_src: true
+  when: mattermost_needs_upgrade
+
+- name: Remove old Mattermost files (preserving data directories per official docs)
+  ansible.builtin.shell: |
+    cd {{ mattermost_install_path }}
+    sudo find . -mindepth 1 -maxdepth 1 \
+      ! -name 'config' \
+      ! -name 'data' \
+      ! -name 'logs' \
+      ! -name 'plugins' \
+      ! -name 'client' \
+      -exec rm -rf {} \;
+  when: mattermost_needs_upgrade
+
+- name: Remove old client directory contents (except plugins)
+  ansible.builtin.shell: |
+    cd {{ mattermost_install_path }}/client
+    sudo find . -mindepth 1 -maxdepth 1 \
+      ! -name 'plugins' \
+      -exec rm -rf {} \;
+  when: mattermost_needs_upgrade
+  failed_when: false
+
+- name: Copy new Mattermost files from temp to installation directory
+  ansible.builtin.shell: |
+    sudo cp -an /tmp/mattermost/. {{ mattermost_install_path }}/
+  when: mattermost_needs_upgrade
+
+- name: Remove temporary Mattermost extraction
+  ansible.builtin.file:
+    path: /tmp/mattermost
+    state: absent
+  when: mattermost_needs_upgrade
+
+- name: Set ownership of Mattermost files after upgrade
+  ansible.builtin.file:
+    path: "{{ mattermost_install_path }}"
+    owner: mattermost
+    group: mattermost
+    recurse: true
+  when: mattermost_needs_upgrade
+
+- name: Display upgrade completion message
+  ansible.builtin.debug:
+    msg:
+      - "=========================================="
+      - "Mattermost upgrade/downgrade complete!"
+      - "Previous version: {{ mattermost_installed_version }}"
+      - "New version: {{ mattermost_version }}"
+      - "Application backup: {{ mattermost_app_backup.dest | default('N/A') }}"
+      - "Database backup: {{ mattermost_backup_dir }}/mattermost-db-backup-{{ ansible_date_time.iso8601_basic_short }}.sql (on database host)"
+      - "=========================================="
+      - "NOTE: Users may need to refresh their browsers"
+  when: mattermost_needs_upgrade
 
 - name: Create mattermost user
   ansible.builtin.user:
@@ -66,48 +192,226 @@
   ansible.builtin.debug:
     msg: "Database host will be: {{ mattermost_db_host | default('UNDEFINED') }}"
 
-- name: Configure Mattermost database connection
-  ansible.builtin.replace:
-    path: "{{ mattermost_install_path }}/config/config.json"
-    regexp: '"DataSource":\s*"postgres://[^"]*"'
-    replace: >-
-      "DataSource": "postgres://{{ mattermost_db_user }}:{{ mattermost_db_password }}@{{
-      mattermost_db_host }}:{{ mattermost_db_port }}/{{ mattermost_db_name }}?sslmode=disable&connect_timeout=10"
+# Detect current configuration storage mode
+- name: Check if environment file exists (indicates database mode was previously used)
+  ansible.builtin.stat:
+    path: "{{ mattermost_install_path }}/config/mattermost.environment"
+  register: mattermost_env_file_stat
 
-- name: Configure Mattermost site URL
-  ansible.builtin.replace:
-    path: "{{ mattermost_install_path }}/config/config.json"
-    regexp: '"SiteURL":\s*"[^"]*"'
-    replace: '"SiteURL": "{{ mattermost_site_url }}"'
-
-- name: Enable local mode for mmctl
-  ansible.builtin.replace:
-    path: "{{ mattermost_install_path }}/config/config.json"
-    regexp: '"EnableLocalMode":\s*(true|false)'
-    replace: '"EnableLocalMode": true'
-  notify: Restart mattermost
-
-- name: Check current rtcd URL configuration
-  ansible.builtin.shell: |
-    jq -r '.PluginSettings.Plugins."com.mattermost.calls".rtcdserviceurl // "not-set"' \
-      {{ mattermost_install_path }}/config/config.json
-  register: mattermost_current_rtcd_url
+- name: Check if MM_CONFIG is set in systemd service
+  ansible.builtin.shell: grep -q "EnvironmentFile=" /etc/systemd/system/mattermost.service || echo "not-found"
+  register: mattermost_systemd_envfile_check
   changed_when: false
-  when:
-    - enable_calls | default(false)
-    - mattermost_rtcd_host is defined
+  failed_when: false
+  when: mattermost_env_file_stat.stat.exists
 
-- name: Configure Mattermost Calls rtcd URL
-  ansible.builtin.shell: |
-    jq '.PluginSettings.Plugins."com.mattermost.calls".rtcdserviceurl = "http://{{ mattermost_rtcd_host }}:8045"' \
-      {{ mattermost_install_path }}/config/config.json > {{ mattermost_install_path }}/config/config.json.tmp && \
-    mv {{ mattermost_install_path }}/config/config.json.tmp {{ mattermost_install_path }}/config/config.json && \
-    chown mattermost:mattermost {{ mattermost_install_path }}/config/config.json
+- name: Determine previous configuration mode
+  ansible.builtin.set_fact:
+    mattermost_previous_mode: "{{ 'database' if (mattermost_env_file_stat.stat.exists and mattermost_systemd_envfile_check.rc == 0) else 'file' }}"
+
+- name: Detect configuration mode change
+  ansible.builtin.set_fact:
+    mattermost_mode_changed: "{{ mattermost_previous_mode != mattermost_config_storage }}"
+
+- name: Display migration information
+  ansible.builtin.debug:
+    msg: "Configuration storage migration: {{ mattermost_previous_mode }} -> {{ mattermost_config_storage }}"
+  when: mattermost_mode_changed | bool
+
+# Migration: File to Database
+- name: Migrate configuration from file to database
   when:
-    - enable_calls | default(false)
-    - mattermost_rtcd_host is defined
-    - mattermost_current_rtcd_url.stdout != "http://" + mattermost_rtcd_host + ":8045"
-  changed_when: true
+    - mattermost_mode_changed | bool
+    - mattermost_previous_mode == "file"
+    - mattermost_config_storage == "database"
+    - mattermost_binary.stat.exists
+  block:
+    - name: Deploy environment file for migration
+      ansible.builtin.template:
+        src: mattermost.environment.j2
+        dest: "{{ mattermost_install_path }}/config/mattermost.environment"
+        owner: mattermost
+        group: mattermost
+        mode: "0600"
+
+    - name: Update systemd service for database mode
+      ansible.builtin.template:
+        src: mattermost.service.j2
+        dest: /etc/systemd/system/mattermost.service
+        mode: "0644"
+      notify:
+        - Reload systemd
+        - Restart mattermost
+
+    - name: Flush handlers to restart with database config
+      ansible.builtin.meta: flush_handlers
+
+    - name: Wait for Mattermost to be ready for migration
+      ansible.builtin.uri:
+        url: "{{ mattermost_site_url }}/api/v4/system/ping"
+        status_code: 200
+      register: mattermost_migrate_ping
+      until: mattermost_migrate_ping.status == 200
+      retries: 30
+      delay: 2
+
+    - name: Migrate config.json to database using mmctl
+      ansible.builtin.command:
+        cmd: >
+          {{ mattermost_install_path }}/bin/mmctl --local config migrate
+          {{ mattermost_install_path }}/config/config.json
+          'postgres://{{ mattermost_db_user }}:{{ mattermost_db_password }}@{{ mattermost_db_host }}:{{ mattermost_db_port }}/
+          {{ mattermost_db_name }}?sslmode=disable&connect_timeout=10'
+      become: true
+      become_user: mattermost
+      register: mattermost_migrate_to_db
+      changed_when: "'Successfully migrated' in mattermost_migrate_to_db.stdout or mattermost_migrate_to_db.rc == 0"
+      failed_when: false
+
+    - name: Display migration result
+      ansible.builtin.debug:
+        msg: "Migration to database result: {{ mattermost_migrate_to_db.stdout }}"
+
+# Migration: Database to File
+- name: Migrate configuration from database to file
+  when:
+    - mattermost_mode_changed | bool
+    - mattermost_previous_mode == "database"
+    - mattermost_config_storage == "file"
+    - mattermost_binary.stat.exists
+  block:
+    - name: Remove environment file
+      ansible.builtin.file:
+        path: "{{ mattermost_install_path }}/config/mattermost.environment"
+        state: absent
+
+    - name: Update systemd service for file mode
+      ansible.builtin.template:
+        src: mattermost.service.j2
+        dest: /etc/systemd/system/mattermost.service
+        mode: "0644"
+      notify:
+        - Reload systemd
+        - Restart mattermost
+
+    - name: Flush handlers to restart with file config
+      ansible.builtin.meta: flush_handlers
+
+    - name: Wait for Mattermost to be ready after switching to file mode
+      ansible.builtin.uri:
+        url: "{{ mattermost_site_url }}/api/v4/system/ping"
+        status_code: 200
+      register: mattermost_file_mode_ping
+      until: mattermost_file_mode_ping.status == 200
+      retries: 30
+      delay: 2
+
+    - name: Backup current config.json
+      ansible.builtin.copy:
+        src: "{{ mattermost_install_path }}/config/config.json"
+        dest: "{{ mattermost_install_path }}/config/config.json.pre-migration"
+        remote_src: true
+        owner: mattermost
+        group: mattermost
+        mode: "0600"
+
+    - name: Export database configuration to file using mmctl
+      ansible.builtin.shell: >
+        {{ mattermost_install_path }}/bin/mmctl --local config show > {{ mattermost_install_path }}/config/config.json.tmp
+      become: true
+      become_user: mattermost
+      register: mattermost_export_config
+      changed_when: true
+
+    - name: Replace config.json with exported configuration
+      ansible.builtin.copy:
+        src: "{{ mattermost_install_path }}/config/config.json.tmp"
+        dest: "{{ mattermost_install_path }}/config/config.json"
+        remote_src: true
+        owner: mattermost
+        group: mattermost
+        mode: "0600"
+      when: mattermost_export_config.rc == 0
+      notify: Restart mattermost
+
+    - name: Remove temporary config file
+      ansible.builtin.file:
+        path: "{{ mattermost_install_path }}/config/config.json.tmp"
+        state: absent
+
+# File-based configuration (config.json)
+- name: Configure Mattermost with file-based storage
+  when:
+    - mattermost_config_storage == "file"
+    - not (mattermost_mode_changed | bool)
+  block:
+    - name: Configure Mattermost database connection
+      ansible.builtin.replace:
+        path: "{{ mattermost_install_path }}/config/config.json"
+        regexp: '"DataSource":\s*"postgres://[^"]*"'
+        replace: >-
+          "DataSource": "postgres://{{ mattermost_db_user }}:{{ mattermost_db_password }}@{{
+          mattermost_db_host }}:{{ mattermost_db_port }}/{{ mattermost_db_name }}?sslmode=disable&connect_timeout=10"
+
+    - name: Configure Mattermost site URL
+      ansible.builtin.replace:
+        path: "{{ mattermost_install_path }}/config/config.json"
+        regexp: '"SiteURL":\s*"[^"]*"'
+        replace: '"SiteURL": "{{ mattermost_site_url }}"'
+
+    - name: Enable local mode for mmctl
+      ansible.builtin.replace:
+        path: "{{ mattermost_install_path }}/config/config.json"
+        regexp: '"EnableLocalMode":\s*(true|false)'
+        replace: '"EnableLocalMode": true'
+      notify: Restart mattermost
+
+    - name: Check current rtcd URL configuration
+      ansible.builtin.shell: |
+        jq -r '.PluginSettings.Plugins."com.mattermost.calls".rtcdserviceurl // "not-set"' \
+          {{ mattermost_install_path }}/config/config.json
+      register: mattermost_current_rtcd_url
+      changed_when: false
+      when:
+        - enable_calls | default(false)
+        - mattermost_rtcd_host is defined
+
+    - name: Configure Mattermost Calls rtcd URL
+      ansible.builtin.shell: |
+        jq '.PluginSettings.Plugins."com.mattermost.calls".rtcdserviceurl = "http://{{ mattermost_rtcd_host }}:8045"' \
+          {{ mattermost_install_path }}/config/config.json > {{ mattermost_install_path }}/config/config.json.tmp && \
+        mv {{ mattermost_install_path }}/config/config.json.tmp {{ mattermost_install_path }}/config/config.json && \
+        chown mattermost:mattermost {{ mattermost_install_path }}/config/config.json
+      when:
+        - enable_calls | default(false)
+        - mattermost_rtcd_host is defined
+        - mattermost_current_rtcd_url.stdout != "http://" + mattermost_rtcd_host + ":8045"
+      changed_when: true
+      notify: Restart mattermost
+
+# Database-based configuration (MM_CONFIG environment variable)
+- name: Configure Mattermost with database storage
+  when:
+    - mattermost_config_storage == "database"
+    - not (mattermost_mode_changed | bool)
+  block:
+    - name: Deploy Mattermost environment file for database config
+      ansible.builtin.template:
+        src: mattermost.environment.j2
+        dest: "{{ mattermost_install_path }}/config/mattermost.environment"
+        owner: mattermost
+        group: mattermost
+        mode: "0600"
+      notify: Restart mattermost
+
+- name: Deploy environment file for database configuration mode
+  ansible.builtin.template:
+    src: mattermost.environment.j2
+    dest: "{{ mattermost_install_path }}/config/mattermost.environment"
+    owner: mattermost
+    group: mattermost
+    mode: "0600"
+  when: mattermost_config_storage == "database"
   notify: Restart mattermost
 
 - name: Create Mattermost systemd service
@@ -165,11 +469,16 @@
     - ansible_os_family == "RedHat"
     - mattermost_firewalld_check.rc == 0
 
+# Note: When using database-based configuration storage, initial configuration
+# is stored in the database. The Mattermost server will start with defaults and
+# can be configured via the System Console UI or mmctl after deployment.
+
 # License activation (optional)
 - name: Flush handlers to ensure Mattermost is restarted with local mode enabled
   ansible.builtin.meta: flush_handlers
+  when: mattermost_config_storage == "file"
 
-- name: Wait for Mattermost to be ready
+- name: Wait for Mattermost to be ready (file config mode)
   ansible.builtin.uri:
     url: "{{ mattermost_site_url }}/api/v4/system/ping"
     status_code: 200
@@ -177,7 +486,21 @@
   until: mattermost_ping.status == 200
   retries: 30
   delay: 2
-  when: mattermost_license_file | length > 0
+  when:
+    - mattermost_license_file | length > 0
+    - mattermost_config_storage == "file"
+
+- name: Wait for Mattermost to be ready (database config mode for license)
+  ansible.builtin.uri:
+    url: "{{ mattermost_site_url }}/api/v4/system/ping"
+    status_code: 200
+  register: mattermost_db_license_ping
+  until: mattermost_db_license_ping.status == 200
+  retries: 30
+  delay: 2
+  when:
+    - mattermost_license_file | length > 0
+    - mattermost_config_storage == "database"
 
 - name: Copy license file to server
   ansible.builtin.copy:

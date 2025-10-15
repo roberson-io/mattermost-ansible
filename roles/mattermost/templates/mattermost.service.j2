@@ -13,7 +13,11 @@ WorkingDirectory={{ mattermost_install_path }}
 User=mattermost
 Group=mattermost
 LimitNOFILE=49152
+{% if mattermost_config_storage == "database" %}
+EnvironmentFile={{ mattermost_install_path }}/config/mattermost.environment
+{% else %}
 Environment="MM_SERVICEENVIRONMENT={{ mattermost_service_environment }}"
+{% endif %}
 
 [Install]
 WantedBy=multi-user.target

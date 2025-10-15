@@ -1,15 +1,10 @@
-.PHONY: help ci clean clean-all deploy-local deploy-local-check deploy-production deploy-production-check install lint lint-fix ping-local ping-production safety-check setup syntax-check test test-all test-certbot test-mattermost test-mattermost-calls test-mattermost-rocky test-nginx test-nginx-rocky test-postgresql test-postgresql-rocky test-rocky test-rtcd test-ubuntu
+.PHONY: help ci clean clean-all deploy-local deploy-local-check deploy-production deploy-production-check install lint lint-fix orb-create-vms orb-create-vms-rocky orb-create-vms-ubuntu orb-delete-vms orb-delete-vms-rocky orb-delete-vms-ubuntu ping-local ping-production safety-check setup syntax-check test test-all test-certbot test-integration test-integration-check-vms test-integration-db-config test-mattermost test-mattermost-calls test-mattermost-db-config test-mattermost-migrate-to-db test-mattermost-rocky test-nginx test-nginx-rocky test-postgresql test-postgresql-rocky test-rocky test-rtcd test-ubuntu test-unit
 
 # Default target
 .DEFAULT_GOAL := help
 
-# Detect OS
-UNAME_S := $(shell uname -s)
-ifeq ($(UNAME_S),Darwin)
-	VENV_ACTIVATE = . venv/bin/activate
-else
-	VENV_ACTIVATE = . venv/bin/activate
-endif
+# Virtual environment activation
+VENV_ACTIVATE = . venv/bin/activate
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -58,6 +53,50 @@ deploy-production-check: ## Dry-run deploy to production
 	@echo "Checking production deployment (dry-run)..."
 	@$(VENV_ACTIVATE) && ansible-playbook -i inventory/production.ini site.yml --check --diff
 
+orb-create-vms: orb-create-vms-rocky ## Create OrbStack VMs for local testing (default: Rocky)
+
+orb-create-vms-rocky: ## Create Rocky Linux 9 AMD64 VMs (mattermost-rocky, postgresql-rocky, rtcd-rocky)
+	@echo "Creating Rocky Linux 9 AMD64 VMs in OrbStack..."
+	@orb create -a amd64 rocky:9 postgresql-rocky || echo "postgresql-rocky may already exist"
+	@orb create -a amd64 rocky:9 mattermost-rocky || echo "mattermost-rocky may already exist"
+	@orb create -a amd64 rocky:9 rtcd-rocky || echo "rtcd-rocky may already exist"
+	@echo "✓ Rocky Linux 9 VMs created"
+	@echo ""
+	@echo "Update inventory/local.ini with:"
+	@echo "  [database]"
+	@echo "  $(USER)@postgresql-rocky@orb"
+	@echo "  [app]"
+	@echo "  $(USER)@mattermost-rocky@orb"
+	@echo "  [rtcd]"
+	@echo "  $(USER)@rtcd-rocky@orb"
+
+orb-create-vms-ubuntu: ## Create Ubuntu AMD64 VMs (mattermost-ubuntu, postgresql-ubuntu, rtcd-ubuntu)
+	@echo "Creating Ubuntu AMD64 VMs in OrbStack..."
+	@orb create -a amd64 ubuntu postgresql-ubuntu || echo "postgresql-ubuntu may already exist"
+	@orb create -a amd64 ubuntu mattermost-ubuntu || echo "mattermost-ubuntu may already exist"
+	@orb create -a amd64 ubuntu rtcd-ubuntu || echo "rtcd-ubuntu may already exist"
+	@echo "✓ Ubuntu VMs created"
+	@echo ""
+	@echo "Update inventory/local.ini with:"
+	@echo "  [database]"
+	@echo "  $(USER)@postgresql-ubuntu@orb"
+	@echo "  [app]"
+	@echo "  $(USER)@mattermost-ubuntu@orb"
+	@echo "  [rtcd]"
+	@echo "  $(USER)@rtcd-ubuntu@orb"
+
+orb-delete-vms: orb-delete-vms-rocky ## Delete OrbStack VMs (default: Rocky)
+
+orb-delete-vms-rocky: ## Delete Rocky Linux VMs
+	@echo "Deleting Rocky Linux VMs..."
+	@orb delete -f postgresql-rocky mattermost-rocky rtcd-rocky 2>/dev/null || true
+	@echo "✓ Rocky Linux VMs deleted"
+
+orb-delete-vms-ubuntu: ## Delete Ubuntu VMs
+	@echo "Deleting Ubuntu VMs..."
+	@orb delete -f postgresql-ubuntu mattermost-ubuntu rtcd-ubuntu 2>/dev/null || true
+	@echo "✓ Ubuntu VMs deleted"
+
 install: ## Install dependencies (creates venv if needed)
 	@if [ ! -d "venv" ]; then \
 		echo "Creating virtual environment..."; \
@@ -97,11 +136,32 @@ syntax-check: ## Check playbook syntax
 	@$(VENV_ACTIVATE) && ansible-playbook site.yml --syntax-check
 	@echo "✓ Syntax check passed"
 
-test: test-ubuntu ## Run all default (Ubuntu) role tests
-	@echo "✓ All default tests completed"
+test: test-unit ## Run all tests (unit + integration)
 
-test-all: test-ubuntu test-rocky test-certbot ## Run ALL tests (Ubuntu + Rocky + certbot)
-	@echo "✓ All multi-distro tests completed"
+test-all: test-unit test-integration ## Run ALL tests (unit + integration)
+	@echo "✓ All tests completed"
+
+test-integration: test-integration-check-vms test-integration-db-config ## Run all integration tests
+	@echo "✓ All integration tests completed"
+
+test-integration-check-vms: ## Verify test VMs are accessible
+	@echo "Checking test VM connectivity..."
+	@if [ ! -f "tests/integration/inventory/test.ini" ]; then \
+		echo "ERROR: tests/integration/inventory/test.ini not found"; \
+		echo "Create test.ini from test.ini.example and configure your test VMs"; \
+		echo "See tests/integration/vm-providers/README.md for setup instructions"; \
+		exit 1; \
+	fi
+	@$(VENV_ACTIVATE) && ansible all -i tests/integration/inventory/test.ini -m ping
+	@echo "✓ Test VMs are accessible"
+
+test-integration-db-config: test-integration-check-vms ## Run database configuration integration tests
+	@echo "Running database configuration integration tests..."
+	@$(VENV_ACTIVATE) && tests/integration/test-database-config.sh
+	@echo "✓ Database configuration integration tests passed"
+
+test-unit: test-ubuntu test-rocky test-certbot ## Run all unit tests (Molecule)
+	@echo "✓ All unit tests completed"
 
 test-certbot: ## Test certbot role (Ubuntu only)
 	@echo "Testing certbot role..."
@@ -114,6 +174,14 @@ test-mattermost: ## Test mattermost role (Ubuntu - default scenario)
 test-mattermost-calls: ## Test mattermost role with Calls/rtcd configuration
 	@echo "Testing mattermost role with Calls enabled..."
 	@$(VENV_ACTIVATE) && cd roles/mattermost && molecule test -s with-calls
+
+test-mattermost-db-config: ## Test mattermost role with database config storage
+	@echo "Testing mattermost role with database config storage..."
+	@$(VENV_ACTIVATE) && cd roles/mattermost && molecule test -s database-config
+
+test-mattermost-migrate-to-db: ## Test file to database config migration
+	@echo "Testing migration from file to database config..."
+	@$(VENV_ACTIVATE) && cd roles/mattermost && molecule test -s migrate-to-db
 
 test-mattermost-rocky: ## Test mattermost role (Rocky Linux)
 	@echo "Testing mattermost role (Rocky Linux)..."

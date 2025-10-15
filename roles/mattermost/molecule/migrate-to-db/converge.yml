@@ -1,0 +1,20 @@
+---
+# First pass: Deploy with file-based configuration
+- name: Converge (file mode)
+  hosts: app
+  become: true
+  gather_facts: true
+  vars:
+    mattermost_config_storage: "file"
+  roles:
+    - mattermost
+
+# Second pass: Switch to database configuration (triggers migration)
+- name: Converge (migrate to database mode)
+  hosts: app
+  become: true
+  gather_facts: true
+  vars:
+    mattermost_config_storage: "database"
+  roles:
+    - mattermost

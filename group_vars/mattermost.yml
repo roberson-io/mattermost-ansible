@@ -11,7 +11,13 @@ postgresql_db_password: "mmuser_password_change_me"
 # Mattermost configuration
 # Note: mattermost_db_host and mattermost_site_url are set dynamically in site.yml
 # using facts gathered from the hosts
-mattermost_version: "10.12.0"
+
+# Configuration storage: "file" (default) or "database"
+# - "file": Config stored in config.json (suitable for single-server)
+# - "database": Config stored in database (recommended for HA clusters)
+mattermost_config_storage: "database"
+
+mattermost_version: "10.12.1"
 mattermost_db_port: 5432
 mattermost_db_name: mattermost
 mattermost_db_user: mmuser

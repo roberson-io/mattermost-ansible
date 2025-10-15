@@ -16,12 +16,13 @@ make test  # or make test-ubuntu
 
 Run individual role tests:
 ```bash
-make test-postgresql        # PostgreSQL role (Ubuntu)
-make test-mattermost        # Mattermost role (Ubuntu)
-make test-mattermost-calls  # Mattermost with Calls configuration (Ubuntu)
-make test-nginx             # Nginx role (Ubuntu)
-make test-rtcd              # RTCD service role (Ubuntu)
-make test-certbot           # Certbot role (Ubuntu)
+make test-postgresql          # PostgreSQL role (Ubuntu)
+make test-mattermost          # Mattermost role (Ubuntu)
+make test-mattermost-calls    # Mattermost with Calls configuration (Ubuntu)
+make test-mattermost-db-config # Mattermost with database config storage (Ubuntu)
+make test-nginx               # Nginx role (Ubuntu)
+make test-rtcd                # RTCD service role (Ubuntu)
+make test-certbot             # Certbot role (Ubuntu)
 ```
 
 ## Test Status
@@ -29,7 +30,7 @@ make test-certbot           # Certbot role (Ubuntu)
 | Role | Scenarios | Status | Notes |
 |------|-----------|--------|-------|
 | postgresql | default (Ubuntu), rocky (Rocky Linux) | ✅ **PASSING** | Full test coverage including idempotence |
-| mattermost | default (Ubuntu), rocky (Rocky Linux), with-calls (Ubuntu) | ✅ **PASSING** | Installation, configuration, license, and Calls integration |
+| mattermost | default (Ubuntu), rocky (Rocky Linux), with-calls (Ubuntu), database-config (Ubuntu) | ✅ **PASSING** | Installation, configuration, license, Calls, and database config storage |
 | nginx | default (Ubuntu), rocky (Rocky Linux) | ✅ **PASSING** | Configuration and service setup |
 | rtcd | default (Ubuntu) | ✅ **PASSING** | Service installation, firewall, and configuration |
 | certbot | default (Ubuntu) | ✅ **PASSING** | Certificate management |
@@ -238,6 +239,25 @@ The default test sequence is:
 - RTCD service URL is configured in config.json at path:
   `PluginSettings.Plugins.com.mattermost.calls.rtcdserviceurl`
 - Configuration is idempotent (no changes on subsequent runs)
+
+### Mattermost with Database Config Tests
+
+**Scenario**: `database-config` in mattermost role
+
+**Containers**:
+- PostgreSQL 14 database
+- Ubuntu 22.04 application server
+
+**Configuration**:
+- `mattermost_config_storage: "database"`
+- Database connection configuration
+
+**Verifies**:
+- All standard Mattermost installation steps
+- Environment file (`mattermost.environment`) exists with `MM_CONFIG` variable
+- Systemd service configured with `EnvironmentFile` directive
+- Mattermost API is accessible and responding
+- Configuration is managed through database instead of config.json
 
 ## Continuous Integration
 

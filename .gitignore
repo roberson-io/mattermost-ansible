@@ -1,10 +1,16 @@
 # Ansible
 *.retry
 .vault_password
+*.backup
+*.bak
+*.yml.*~
+*.yaml.*~
 
 # Inventory files (keep .example templates)
 inventory/*.ini
 !inventory/*.ini.example
+tests/integration/inventory/*.ini
+!tests/integration/inventory/*.ini.example
 
 # Python
 *.pyc

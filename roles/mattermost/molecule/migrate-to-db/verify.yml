@@ -1,0 +1,58 @@
+---
+- name: Verify
+  hosts: app
+  gather_facts: false
+  tasks:
+    - name: Check Mattermost binary exists
+      ansible.builtin.stat:
+        path: /opt/mattermost/bin/mattermost
+      register: mm_bin
+      failed_when: not mm_bin.stat.exists
+
+    - name: Check Mattermost user exists
+      ansible.builtin.getent:
+        database: passwd
+        key: mattermost
+      register: mm_user
+      failed_when: mm_user.failed
+
+    - name: Check Mattermost service exists
+      ansible.builtin.stat:
+        path: /etc/systemd/system/mattermost.service
+      register: mm_service
+      failed_when: not mm_service.stat.exists
+
+    - name: Check Mattermost service is enabled
+      ansible.builtin.systemd:
+        name: mattermost
+        enabled: true
+      check_mode: true
+      register: svc_enabled
+      failed_when: svc_enabled is changed
+
+    - name: Verify Mattermost environment file exists
+      ansible.builtin.stat:
+        path: /opt/mattermost/config/mattermost.environment
+      register: mm_env_file
+      failed_when: not mm_env_file.stat.exists
+
+    - name: Verify MM_CONFIG is set in environment file
+      ansible.builtin.command: grep "MM_CONFIG=" /opt/mattermost/config/mattermost.environment
+      changed_when: false
+      register: mm_config_env
+      failed_when: mm_config_env.rc != 0
+
+    - name: Verify EnvironmentFile is set in systemd service
+      ansible.builtin.command: grep "EnvironmentFile=" /etc/systemd/system/mattermost.service
+      changed_when: false
+      register: env_file_check
+      failed_when: env_file_check.rc != 0
+
+    - name: Verify Mattermost directory ownership
+      ansible.builtin.stat:
+        path: /opt/mattermost
+      register: mm_dir
+      failed_when: mm_dir.stat.pw_name != 'mattermost'
+
+    # Note: Skipping API accessibility check as Mattermost service may not start
+    # in test containers. The deployment configuration is verified above.

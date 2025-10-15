@@ -3,6 +3,12 @@
 mattermost_version: "10.12.0"
 mattermost_install_path: /opt/mattermost
 
+# Configuration storage mode
+# Options: "file" (default) or "database"
+# - "file": Configuration stored in config.json (suitable for single-server)
+# - "database": Configuration stored in database (recommended for HA clusters)
+mattermost_config_storage: "file"
+
 # Database connection (can be overridden in group_vars)
 mattermost_db_host: localhost
 mattermost_db_port: 5432
@@ -13,6 +19,9 @@ mattermost_db_password: "mmuser_password_change_me"
 # Site configuration
 mattermost_site_url: "http://{{ ansible_default_ipv4.address }}:8065"
 mattermost_listen_address: ":8065"
+
+# Backup configuration
+mattermost_backup_dir: "/var/backups/mattermost"  # Directory for database backups
 
 # License configuration (optional)
 mattermost_license_file: ""  # Path to license file (e.g., license.mattermost)

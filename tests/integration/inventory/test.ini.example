@@ -1,0 +1,36 @@
+# Integration test inventory
+# Copy this file to test.ini and configure for your test VMs:
+#   cp tests/integration/inventory/test.ini.example tests/integration/inventory/test.ini
+#
+# The test VMs should be freshly created for each test run to ensure clean state.
+#
+# Supported VM providers:
+# - OrbStack: use vm-providers/orbstack.sh
+# - Multipass: use vm-providers/multipass.sh
+# - Vagrant: use vm-providers/vagrant/
+# - Manual: any 3 VMs with SSH access
+
+[database]
+# PostgreSQL test VM
+# Examples:
+#   OrbStack:    user@test-postgresql@orb
+#   Multipass:   user@test-postgresql.mshome.net
+#   IP address:  192.168.122.10 ansible_user=testuser
+test-postgresql ansible_host=CHANGE_ME
+
+[app]
+# Mattermost application test VM
+test-mattermost ansible_host=CHANGE_ME
+
+[rtcd]
+# RTCD (Calls) test VM
+test-rtcd ansible_host=CHANGE_ME
+
+[mattermost:children]
+database
+app
+rtcd
+
+[mattermost:vars]
+ansible_python_interpreter=/usr/bin/python3
+mattermost_environment=test

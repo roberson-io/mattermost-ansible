@@ -292,6 +292,85 @@ The playbook will:
 
 For more information, see [Mattermost Calls documentation](https://docs.mattermost.com/configure/calls-deployment.html).
 
+### Configuration Storage Options
+
+Mattermost supports two methods for storing configuration: **file-based** (default) and **database-based**.
+
+#### File-Based Configuration (Default)
+
+Configuration is stored in `config.json` on the Mattermost server.
+
+**When to use:**
+- Single-server deployments
+- Development environments
+- Simpler backup and version control of configuration
+
+**Setup** (automatic - this is the default):
+```yaml
+# In group_vars/mattermost.yml or group_vars/production.yml
+mattermost_config_storage: "file"  # This is the default
+```
+
+#### Database-Based Configuration
+
+Configuration is stored in the PostgreSQL database.
+
+**When to use:**
+- High Availability (HA) cluster deployments
+- Multiple Mattermost servers sharing configuration
+- Dynamic configuration changes via System Console across all nodes
+
+**Benefits:**
+- Centralized configuration management
+- Immediate sync across HA cluster nodes
+- Recommended by Mattermost for production HA deployments
+
+**Setup:**
+```yaml
+# In group_vars/mattermost.yml or group_vars/production.yml
+mattermost_config_storage: "database"
+```
+
+Then deploy or redeploy:
+```bash
+ansible-playbook -i inventory/production.ini site.yml
+```
+
+**What happens:**
+- Environment file created with `MM_CONFIG` pointing to database
+- Configuration automatically applied via `mmctl` commands
+- config.json remains but is no longer the primary configuration source
+- Changes via System Console are stored in database
+
+**Switching modes:**
+Simply change the `mattermost_config_storage` variable and redeploy. The playbook handles the transition automatically.
+
+For more information, see [Mattermost database configuration documentation](https://docs.mattermost.com/administration-guide/configure/configuration-in-your-database.html).
+
+## Upgrading/Downgrading Mattermost
+
+To upgrade or downgrade Mattermost to a different version:
+
+1. Update the version in `group_vars/mattermost.yml` (local) or `group_vars/production.yml`:
+   ```yaml
+   mattermost_version: "10.12.1"  # Change to desired version
+   ```
+
+2. Run the playbook:
+   ```bash
+   ansible-playbook -i inventory/local.ini site.yml
+   ```
+
+The playbook automatically:
+- Detects the current version and compares with desired version
+- Stops the Mattermost service
+- Backs up the database to `/var/backups/mattermost/` (on database host)
+- Backs up the application directory to `/opt/mattermost-back-YYYY-MM-DD-HH-mm`
+- Downloads and installs the new version (preserving config, data, logs, plugins)
+- Restarts the service
+
+**Note:** Users may need to refresh their browsers after an upgrade. The playbook follows the [official Mattermost upgrade documentation](https://docs.mattermost.com/administration-guide/upgrade/upgrading-mattermost-server.html).
+
 ## Security Notes
 
 Production deployment includes:
