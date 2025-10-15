@@ -1,4 +1,4 @@
-.PHONY: help ci clean clean-all deploy-local deploy-local-check deploy-production deploy-production-check install lint lint-fix orb-create-vms orb-create-vms-rocky orb-create-vms-ubuntu orb-delete-vms orb-delete-vms-rocky orb-delete-vms-ubuntu ping-local ping-production safety-check setup syntax-check test test-all test-certbot test-integration test-integration-check-vms test-integration-db-config test-mattermost test-mattermost-calls test-mattermost-db-config test-mattermost-migrate-to-db test-mattermost-rocky test-nginx test-nginx-rocky test-postgresql test-postgresql-rocky test-rocky test-rtcd test-ubuntu test-unit
+.PHONY: help ci clean clean-all deploy-local deploy-local-check deploy-production deploy-production-check install lint lint-fix orb-create-vms orb-create-vms-rocky orb-create-vms-ubuntu orb-delete-vms orb-delete-vms-rocky orb-delete-vms-ubuntu ping-local ping-production safety-check setup syntax-check test test-all test-certbot test-integration test-integration-check-vms test-integration-db-config test-mattermost test-mattermost-boards test-mattermost-calls test-mattermost-db-config test-mattermost-migrate-to-db test-mattermost-rocky test-nginx test-nginx-rocky test-postgresql test-postgresql-rocky test-rocky test-rtcd test-ubuntu test-unit
 
 # Default target
 .DEFAULT_GOAL := help
@@ -171,6 +171,10 @@ test-mattermost: ## Test mattermost role (Ubuntu - default scenario)
 	@echo "Testing mattermost role (Ubuntu)..."
 	@$(VENV_ACTIVATE) && cd roles/mattermost && molecule test -s default
 
+test-mattermost-boards: ## Test mattermost role with Boards plugin
+	@echo "Testing mattermost role with Boards plugin..."
+	@$(VENV_ACTIVATE) && cd roles/mattermost && molecule test -s with-boards
+
 test-mattermost-calls: ## Test mattermost role with Calls/rtcd configuration
 	@echo "Testing mattermost role with Calls enabled..."
 	@$(VENV_ACTIVATE) && cd roles/mattermost && molecule test -s with-calls
@@ -210,5 +214,5 @@ test-rtcd: ## Test rtcd role (Ubuntu - default scenario)
 	@echo "Testing rtcd role (Ubuntu)..."
 	@$(VENV_ACTIVATE) && cd roles/rtcd && molecule test -s default
 
-test-ubuntu: test-postgresql test-mattermost test-mattermost-calls test-nginx test-rtcd ## Run all Ubuntu tests (default scenarios)
+test-ubuntu: test-postgresql test-mattermost test-mattermost-boards test-mattermost-calls test-nginx test-rtcd ## Run all Ubuntu tests (default scenarios)
 	@echo "✓ All Ubuntu tests completed"

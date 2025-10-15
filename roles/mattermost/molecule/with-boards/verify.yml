@@ -1,0 +1,79 @@
+---
+- name: Verify
+  hosts: app
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Check if Mattermost service is running
+      ansible.builtin.systemd:
+        name: mattermost
+      register: mattermost_service
+      failed_when: mattermost_service.status.ActiveState != "active"
+
+    - name: Wait for Mattermost to be ready
+      ansible.builtin.uri:
+        url: "http://localhost:8065/api/v4/system/ping"
+        status_code: 200
+      register: ping_result
+      until: ping_result.status == 200
+      retries: 30
+      delay: 2
+
+    - name: Check if Boards plugin directory exists
+      ansible.builtin.stat:
+        path: /opt/mattermost/plugins/focalboard
+      register: mattermost_boards_plugin_dir
+      failed_when: not mattermost_boards_plugin_dir.stat.exists
+
+    - name: Verify Boards plugin is installed via mmctl
+      ansible.builtin.command:
+        cmd: /opt/mattermost/bin/mmctl --local plugin list
+      become: true
+      become_user: mattermost
+      register: plugin_list
+      changed_when: false
+      failed_when: "'focalboard' not in plugin_list.stdout"
+
+    - name: Verify Boards plugin is enabled
+      ansible.builtin.command:
+        cmd: /opt/mattermost/bin/mmctl --local plugin list
+      become: true
+      become_user: mattermost
+      register: plugin_status
+      changed_when: false
+      failed_when: "'focalboard: Mattermost Boards' not in plugin_status.stdout"
+
+    - name: Verify plugin uploads are enabled
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          /opt/mattermost/bin/mmctl --local config get PluginSettings.EnableUploads | grep -q 'true'
+        executable: /bin/bash
+      become: true
+      become_user: mattermost
+      register: uploads_enabled
+      changed_when: false
+      failed_when: uploads_enabled.rc != 0
+
+    - name: Verify plugins are enabled
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          /opt/mattermost/bin/mmctl --local config get PluginSettings.Enable | grep -q 'true'
+        executable: /bin/bash
+      become: true
+      become_user: mattermost
+      register: plugins_enabled
+      changed_when: false
+      failed_when: plugins_enabled.rc != 0
+
+    - name: Display verification results
+      ansible.builtin.debug:
+        msg:
+          - "✓ Mattermost service is running"
+          - "✓ Mattermost API is responding"
+          - "✓ Boards plugin directory exists"
+          - "✓ Boards plugin is installed"
+          - "✓ Boards plugin is enabled"
+          - "✓ Plugin uploads are enabled"
+          - "✓ Plugins are enabled"

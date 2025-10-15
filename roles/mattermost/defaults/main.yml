@@ -26,3 +26,7 @@ mattermost_backup_dir: "/var/backups/mattermost"  # Directory for database backu
 # License configuration (optional)
 mattermost_license_file: ""  # Path to license file (e.g., license.mattermost)
 mattermost_service_environment: "production"  # Required: production, test, or dev
+
+# Boards plugin configuration (optional)
+mattermost_enable_boards: false  # Set to true to install Mattermost Boards plugin
+mattermost_boards_version: "9.1.6"  # Version of Boards plugin to install

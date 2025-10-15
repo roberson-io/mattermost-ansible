@@ -5,6 +5,7 @@
 *.bak
 *.yml.*~
 *.yaml.*~
+.ansible/
 
 # Inventory files (keep .example templates)
 inventory/*.ini

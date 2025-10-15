@@ -31,6 +31,11 @@ mattermost_service_environment: "test"  # Options: test, production, or dev
 # Mattermost Calls configuration (optional)
 # Enable Calls by setting enable_calls to true and configuring an rtcd host in inventory
 enable_calls: true
+
+# Mattermost Boards configuration (optional)
+# Enable Boards plugin for project management features
+mattermost_enable_boards: true
+mattermost_boards_version: "9.1.6"
 # rtcd_version: "v1.2.1"
 # rtcd_api_listen_address: "0.0.0.0:8045"
 # rtcd_ice_port_udp: 8443

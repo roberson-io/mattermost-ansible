@@ -10,7 +10,9 @@ Role-based Ansible playbooks to deploy Mattermost for both local development and
 - **Production-ready**: Includes nginx reverse proxy and Let's Encrypt SSL/TLS
 - **Separate database tier**: PostgreSQL on dedicated host
 - **Optional Mattermost Calls**: Real-time voice/video with dedicated rtcd service
+- **Optional Mattermost Boards**: Project management and kanban boards plugin
 - **Enterprise license support**: Automated license activation with mmctl
+- **Automated upgrades/downgrades**: Version management with automatic backups
 
 ## Prerequisites
 
@@ -291,6 +293,34 @@ The playbook will:
 - For production, configure appropriate firewall rules to allow UDP/TCP traffic on media ports
 
 For more information, see [Mattermost Calls documentation](https://docs.mattermost.com/configure/calls-deployment.html).
+
+### Mattermost Boards Configuration
+
+To enable Mattermost Boards for project management features:
+
+1. **Enable Boards** in `group_vars/mattermost.yml` or `group_vars/production.yml`:
+   ```yaml
+   mattermost_enable_boards: true
+   mattermost_boards_version: "9.1.6"  # Optional: specify version (default is 9.1.6)
+   ```
+
+2. **Deploy or redeploy**:
+   ```bash
+   ansible-playbook -i inventory/local.ini site.yml
+   ```
+
+The playbook will:
+- Enable plugin support in Mattermost
+- Download the Boards plugin from GitHub releases
+- Install and enable the plugin using `mmctl`
+- Make Boards available in the Mattermost interface
+
+**Notes:**
+- Boards appears in the main Mattermost interface after installation
+- The plugin ID is `focalboard` (Boards was formerly called Focalboard)
+- Requires Mattermost to be running with local mode enabled for `mmctl` access
+
+For more information, see [Mattermost Boards documentation](https://docs.mattermost.com/guides/boards.html).
 
 ### Configuration Storage Options
 

@@ -25,7 +25,11 @@
   register: mattermost_binary
 
 - name: Get current Mattermost version
-  ansible.builtin.shell: "{{ mattermost_install_path }}/bin/mattermost version | grep '^Version:' | awk '{print $2}'"
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      {{ mattermost_install_path }}/bin/mattermost version | grep '^Version:' | awk '{print $2}'
+    executable: /bin/bash
   register: mattermost_current_version
   changed_when: false
   failed_when: false
@@ -42,7 +46,10 @@
     msg:
       - "Current version: {{ mattermost_installed_version }}"
       - "Desired version: {{ mattermost_version }}"
-      - "Action needed: {{ 'fresh install' if mattermost_needs_install else ('upgrade/downgrade' if mattermost_needs_upgrade else 'none (already at desired version)') }}"
+      - >-
+        Action needed: {{ 'fresh install' if mattermost_needs_install
+        else ('upgrade/downgrade' if mattermost_needs_upgrade
+        else 'none (already at desired version)') }}
 
 - name: Stop Mattermost for upgrade/downgrade
   ansible.builtin.systemd:
@@ -57,20 +64,24 @@
     owner: postgres
     group: postgres
     mode: "0750"
-  delegate_to: "{{ groups['database'][0] }}"
+  delegate_to: "{{ groups.database | first }}"
   become: true
-  when: mattermost_needs_upgrade
+  when:
+    - mattermost_needs_upgrade
+    - groups.get('database', []) | length > 0
 
 - name: Backup database before upgrade/downgrade
   community.postgresql.postgresql_db:
     name: "{{ mattermost_db_name }}"
     state: dump
     target: "{{ mattermost_backup_dir }}/mattermost-db-backup-{{ ansible_date_time.iso8601_basic_short }}.sql"
-  delegate_to: "{{ groups['database'][0] }}"
+  delegate_to: "{{ groups.database | first }}"
   become: true
   become_user: postgres
   register: mattermost_db_backup
-  when: mattermost_needs_upgrade
+  when:
+    - mattermost_needs_upgrade
+    - groups.get('database', []) | length > 0
 
 - name: Backup Mattermost application directory (following official naming convention)
   ansible.builtin.copy:
@@ -79,6 +90,7 @@
     remote_src: true
     owner: mattermost
     group: mattermost
+    mode: "0755"
   register: mattermost_app_backup
   when: mattermost_needs_upgrade
 
@@ -122,6 +134,7 @@
       ! -name 'plugins' \
       ! -name 'client' \
       -exec rm -rf {} \;
+  changed_when: true
   when: mattermost_needs_upgrade
 
 - name: Remove old client directory contents (except plugins)
@@ -130,12 +143,14 @@
     sudo find . -mindepth 1 -maxdepth 1 \
       ! -name 'plugins' \
       -exec rm -rf {} \;
+  changed_when: true
   when: mattermost_needs_upgrade
   failed_when: false
 
 - name: Copy new Mattermost files from temp to installation directory
   ansible.builtin.shell: |
     sudo cp -an /tmp/mattermost/. {{ mattermost_install_path }}/
+  changed_when: true
   when: mattermost_needs_upgrade
 
 - name: Remove temporary Mattermost extraction
@@ -543,3 +558,130 @@
   ansible.builtin.debug:
     msg: "License upload result: {{ mattermost_license_upload.stdout | default('No license uploaded') }}"
   when: mattermost_license_file | length > 0
+
+#
+# Boards plugin installation (optional)
+#
+- name: Enable plugin uploads (required for Boards plugin)
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set PluginSettings.EnableUploads true
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when: mattermost_enable_boards | default(false)
+
+- name: Enable plugins (required for Boards plugin)
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set PluginSettings.Enable true
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when: mattermost_enable_boards | default(false)
+
+- name: Check if Boards plugin is already installed
+  ansible.builtin.stat:
+    path: "{{ mattermost_install_path }}/plugins/focalboard"
+  register: mattermost_boards_plugin_installed
+  when: mattermost_enable_boards | default(false)
+
+- name: Get current Boards plugin version
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      {{ mattermost_install_path }}/bin/mmctl --local plugin list | grep focalboard | awk -F', Version: ' '{print $2}'
+    executable: /bin/bash
+  become: true
+  become_user: mattermost
+  register: mattermost_boards_current_version
+  changed_when: false
+  failed_when: false
+  when:
+    - mattermost_enable_boards | default(false)
+    - mattermost_boards_plugin_installed.stat.exists
+
+- name: Set Boards plugin version facts
+  ansible.builtin.set_fact:
+    mattermost_mattermost_boards_installed_version: >-
+      {{ mattermost_boards_current_version.stdout | default('none') }}
+    mattermost_boards_needs_upgrade: >-
+      {{ mattermost_boards_plugin_installed.stat.exists and
+      mattermost_boards_current_version.stdout != mattermost_boards_version }}
+    mattermost_boards_needs_install: >-
+      {{ not mattermost_boards_plugin_installed.stat.exists }}
+  when: mattermost_enable_boards | default(false)
+
+- name: Display Boards plugin version information
+  ansible.builtin.debug:
+    msg:
+      - "Current Boards version: {{ mattermost_mattermost_boards_installed_version | default('none') }}"
+      - "Desired Boards version: {{ mattermost_boards_version }}"
+      - >-
+        Action needed: {{ 'fresh install' if mattermost_boards_needs_install
+        else ('upgrade/downgrade' if mattermost_boards_needs_upgrade
+        else 'none (already at desired version)') }}
+  when: mattermost_enable_boards | default(false)
+
+- name: Remove old Boards plugin for upgrade/downgrade
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local plugin delete
+      focalboard
+  become: true
+  become_user: mattermost
+  register: mattermost_boards_remove
+  changed_when: mattermost_boards_remove.rc == 0
+  failed_when: false
+  when:
+    - mattermost_enable_boards | default(false)
+    - mattermost_boards_needs_upgrade | default(false)
+
+- name: Download Boards plugin
+  ansible.builtin.get_url:
+    url: >-
+      https://github.com/mattermost/mattermost-plugin-boards/releases/download/v{{ mattermost_boards_version }}/
+      mattermost-plugin-boards-v{{ mattermost_boards_version }}-linux-amd64.tar.gz
+    dest: "/tmp/mattermost-plugin-boards-v{{ mattermost_boards_version }}.tar.gz"
+    mode: "0644"
+    timeout: 120
+  when:
+    - mattermost_enable_boards | default(false)
+    - mattermost_boards_needs_install | default(false) or mattermost_boards_needs_upgrade | default(false)
+
+- name: Install Boards plugin using mmctl
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local plugin add
+      /tmp/mattermost-plugin-boards-v{{ mattermost_boards_version }}.tar.gz
+  become: true
+  become_user: mattermost
+  register: mattermost_boards_install
+  changed_when: "'Uploaded' in mattermost_boards_install.stdout or mattermost_boards_install.rc == 0"
+  failed_when: mattermost_boards_install.rc != 0 and 'already exists' not in mattermost_boards_install.stderr
+  when:
+    - mattermost_enable_boards | default(false)
+    - mattermost_boards_needs_install | default(false) or mattermost_boards_needs_upgrade | default(false)
+
+- name: Enable Boards plugin
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local plugin enable
+      focalboard
+  become: true
+  become_user: mattermost
+  register: mattermost_boards_enable
+  changed_when: "'Enabled' in mattermost_boards_enable.stdout or mattermost_boards_enable.rc == 0"
+  failed_when: mattermost_boards_enable.rc != 0 and 'already enabled' not in mattermost_boards_enable.stderr
+  when: mattermost_enable_boards | default(false)
+
+- name: Remove temporary Boards plugin file
+  ansible.builtin.file:
+    path: "/tmp/mattermost-plugin-boards-v{{ mattermost_boards_version }}.tar.gz"
+    state: absent
+  when: mattermost_enable_boards | default(false)
+
+- name: Display Boards plugin installation status
+  ansible.builtin.debug:
+    msg: "Mattermost Boards plugin v{{ mattermost_boards_version }} installed and enabled"
+  when: mattermost_enable_boards | default(false)
