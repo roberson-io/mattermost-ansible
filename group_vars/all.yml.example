@@ -1,0 +1,10 @@
+---
+# Ansible Vault encrypted secrets
+# Copy this file to all.yml and encrypt it with: ansible-vault encrypt group_vars/all.yml
+# All variables prefixed with vault_ will be referenced from group_vars files
+
+# Local environment database password (used by mattermost.yml)
+vault_local_db_password: "change_me_secure_password"
+
+# Production environment database password (used by production.yml)
+vault_production_db_password: "change_me_secure_password"

@@ -6,7 +6,7 @@ postgresql_allow_remote: true
 postgresql_listen_addresses: "*"
 postgresql_db_name: mattermost
 postgresql_db_user: mmuser
-postgresql_db_password: "mmuser_password_change_me"
+postgresql_db_password: "{{ vault_local_db_password }}"
 
 # Mattermost configuration
 # Note: mattermost_db_host and mattermost_site_url are set dynamically in site.yml
@@ -21,7 +21,7 @@ mattermost_version: "10.12.1"
 mattermost_db_port: 5432
 mattermost_db_name: mattermost
 mattermost_db_user: mmuser
-mattermost_db_password: "mmuser_password_change_me"
+mattermost_db_password: "{{ vault_local_db_password }}"
 
 # License configuration (optional)
 # Uncomment and set path to your license file to activate Enterprise features

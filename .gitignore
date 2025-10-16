@@ -1,11 +1,14 @@
 # Ansible
 *.retry
 .vault_password
+.vault_pass
+vault_password.txt
 *.backup
 *.bak
 *.yml.*~
 *.yaml.*~
 .ansible/
+group_vars/all.yml
 
 # Inventory files (keep .example templates)
 inventory/*.ini

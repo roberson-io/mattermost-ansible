@@ -63,6 +63,22 @@ Role-based Ansible playbooks to deploy Mattermost for both local development and
 
    Then edit the inventory file to match your environment (see Configuration section below).
 
+4. **Set up Ansible Vault for secrets:**
+   ```bash
+   # Create vault file from example
+   cp group_vars/all.yml.example group_vars/all.yml
+
+   # Edit all.yml and set your passwords
+   # Then encrypt the file
+   ansible-vault encrypt group_vars/all.yml
+
+   # Create a password file (optional, for convenience)
+   echo "your_vault_password" > .vault_password
+   chmod 600 .vault_password
+   ```
+
+   See [Security with Ansible Vault](#security-with-ansible-vault) for more details.
+
 ## Project Structure
 
 ```
@@ -74,7 +90,9 @@ Role-based Ansible playbooks to deploy Mattermost for both local development and
 │   └── *.ini                     # Your custom inventory files (gitignored)
 ├── group_vars/
 │   ├── mattermost.yml            # Local environment variables
-│   └── production.yml            # Production environment variables
+│   ├── production.yml            # Production environment variables
+│   ├── all.yml.example         # Vault template for secrets
+│   └── all.yml                 # Encrypted secrets (gitignored)
 └── roles/
     ├── postgresql/               # Database setup
     ├── mattermost/               # Mattermost application
@@ -400,6 +418,100 @@ The playbook automatically:
 - Restarts the service
 
 **Note:** Users may need to refresh their browsers after an upgrade. The playbook follows the [official Mattermost upgrade documentation](https://docs.mattermost.com/administration-guide/upgrade/upgrading-mattermost-server.html).
+
+## Security with Ansible Vault
+
+Ansible Vault encrypts sensitive information like database passwords and API keys, protecting them from being exposed in version control.
+
+### Initial Setup
+
+**Option 1: Auto-generate secure passwords (recommended):**
+```bash
+make vault-create-secure   # Creates all.yml with cryptographically secure passwords
+make vault-encrypt          # Encrypt it
+echo "your_vault_password" > .vault_password && chmod 600 .vault_password
+```
+
+**Option 2: Manual password setup:**
+```bash
+make vault-create           # Creates all.yml from template
+nano group_vars/all.yml   # Edit with your passwords
+make vault-encrypt          # Encrypt it
+echo "your_vault_password" > .vault_password && chmod 600 .vault_password
+```
+
+The `.vault_password` file is gitignored and stores your vault encryption password for convenience.
+
+### Using the Vault
+
+The Makefile automatically detects and uses `.vault_password` if it exists. If not, you'll be prompted for the password.
+
+**Deploy with vault (automatic):**
+```bash
+make deploy-local      # Uses .vault_password if present, otherwise prompts
+make deploy-production # Same behavior
+```
+
+**Manual playbook execution:**
+```bash
+# Option 1: Password file (convenient for local dev)
+ansible-playbook -i inventory/local.ini site.yml --vault-password-file .vault_password
+
+# Option 2: Prompt for password (more secure for production)
+ansible-playbook -i inventory/local.ini site.yml --ask-vault-pass
+```
+
+### Managing Vault Secrets
+
+**Using Makefile targets (recommended):**
+```bash
+make vault-create         # Create all.yml from template
+make vault-create-secure  # Create all.yml with auto-generated secure passwords
+make vault-encrypt        # Encrypt the vault file
+make vault-view           # View encrypted vault contents
+make vault-edit           # Edit encrypted vault (decrypts, opens editor, re-encrypts)
+make vault-rekey          # Change vault password
+make vault-decrypt        # Decrypt vault (WARNING: removes encryption)
+```
+
+**Using ansible-vault directly:**
+```bash
+ansible-vault view group_vars/all.yml     # View encrypted vault
+ansible-vault edit group_vars/all.yml     # Edit encrypted vault
+ansible-vault rekey group_vars/all.yml    # Change vault password
+ansible-vault decrypt group_vars/all.yml  # Decrypt vault (not recommended)
+```
+
+### Vault Variables
+
+The vault file defines secrets with the `vault_` prefix:
+- `vault_local_db_password` - Database password for local/dev environment
+- `vault_production_db_password` - Database password for production environment
+
+These are referenced in their respective group_vars files:
+
+**In `group_vars/mattermost.yml` (local):**
+```yaml
+postgresql_db_password: "{{ vault_local_db_password }}"
+mattermost_db_password: "{{ vault_local_db_password }}"
+```
+
+**In `group_vars/production.yml`:**
+```yaml
+postgresql_db_password: "{{ vault_production_db_password }}"
+mattermost_db_password: "{{ vault_production_db_password }}"
+```
+
+**Note:** Both `postgresql_db_password` and `mattermost_db_password` reference the same vault variable because they represent the same password - the PostgreSQL role creates the database user with this password, and the Mattermost role uses it to connect.
+
+### Production Best Practices
+
+For production environments:
+1. Use `--ask-vault-pass` instead of password files
+2. Store vault passwords in a secure password manager
+3. Use different vault passwords for different environments
+4. Regularly rotate secrets and rekey the vault
+5. Consider using external secret management (HashiCorp Vault, AWS Secrets Manager, etc.)
 
 ## Security Notes
 

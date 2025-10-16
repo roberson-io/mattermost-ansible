@@ -1,10 +1,14 @@
-.PHONY: help ci clean clean-all deploy-local deploy-local-check deploy-production deploy-production-check install lint lint-fix orb-create-vms orb-create-vms-rocky orb-create-vms-ubuntu orb-delete-vms orb-delete-vms-rocky orb-delete-vms-ubuntu ping-local ping-production safety-check setup syntax-check test test-all test-certbot test-integration test-integration-check-vms test-integration-db-config test-mattermost test-mattermost-boards test-mattermost-calls test-mattermost-db-config test-mattermost-migrate-to-db test-mattermost-rocky test-nginx test-nginx-rocky test-postgresql test-postgresql-rocky test-rocky test-rtcd test-ubuntu test-unit
+.PHONY: help ci clean clean-all deploy-local deploy-local-check deploy-production deploy-production-check install lint lint-fix orb-create-vms orb-create-vms-rocky orb-create-vms-ubuntu orb-delete-vms orb-delete-vms-rocky orb-delete-vms-ubuntu ping-local ping-production safety-check setup syntax-check test test-all test-certbot test-integration test-integration-check-vms test-integration-db-config test-mattermost test-mattermost-boards test-mattermost-calls test-mattermost-db-config test-mattermost-migrate-to-db test-mattermost-rocky test-nginx test-nginx-rocky test-postgresql test-postgresql-rocky test-rocky test-rtcd test-ubuntu test-unit vault-create vault-create-secure vault-decrypt vault-edit vault-encrypt vault-rekey vault-view
 
 # Default target
 .DEFAULT_GOAL := help
 
 # Virtual environment activation
 VENV_ACTIVATE = . venv/bin/activate
+
+# Vault password file (if exists)
+VAULT_PASSWORD_FILE = .vault_password
+VAULT_PASS_ARG = $(shell [ -f $(VAULT_PASSWORD_FILE) ] && echo "--vault-password-file $(VAULT_PASSWORD_FILE)" || echo "")
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -33,25 +37,25 @@ clean-all: clean ## Clean everything including venv
 
 deploy-local: ## Deploy to local VMs (inventory/local.ini)
 	@echo "Deploying to local environment..."
-	@$(VENV_ACTIVATE) && ansible-playbook -i inventory/local.ini site.yml
+	@$(VENV_ACTIVATE) && ansible-playbook -i inventory/local.ini site.yml $(VAULT_PASS_ARG)
 
 deploy-local-check: ## Dry-run deploy to local VMs
 	@echo "Checking local deployment (dry-run)..."
-	@$(VENV_ACTIVATE) && ansible-playbook -i inventory/local.ini site.yml --check --diff
+	@$(VENV_ACTIVATE) && ansible-playbook -i inventory/local.ini site.yml --check --diff $(VAULT_PASS_ARG)
 
 deploy-production: ## Deploy to production (inventory/production.ini)
 	@echo "Deploying to production environment..."
 	@read -p "Are you sure you want to deploy to PRODUCTION? [y/N] " -n 1 -r; \
 	echo; \
 	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
-		$(VENV_ACTIVATE) && ansible-playbook -i inventory/production.ini site.yml; \
+		$(VENV_ACTIVATE) && ansible-playbook -i inventory/production.ini site.yml $(VAULT_PASS_ARG); \
 	else \
 		echo "Deployment cancelled."; \
 	fi
 
 deploy-production-check: ## Dry-run deploy to production
 	@echo "Checking production deployment (dry-run)..."
-	@$(VENV_ACTIVATE) && ansible-playbook -i inventory/production.ini site.yml --check --diff
+	@$(VENV_ACTIVATE) && ansible-playbook -i inventory/production.ini site.yml --check --diff $(VAULT_PASS_ARG)
 
 orb-create-vms: orb-create-vms-rocky ## Create OrbStack VMs for local testing (default: Rocky)
 
@@ -216,3 +220,81 @@ test-rtcd: ## Test rtcd role (Ubuntu - default scenario)
 
 test-ubuntu: test-postgresql test-mattermost test-mattermost-boards test-mattermost-calls test-nginx test-rtcd ## Run all Ubuntu tests (default scenarios)
 	@echo "✓ All Ubuntu tests completed"
+
+vault-create: ## Create vault file from example template
+	@if [ -f "group_vars/all.yml" ]; then \
+		echo "ERROR: group_vars/all.yml already exists"; \
+		echo "Use 'make vault-edit' to modify it or remove it first"; \
+		exit 1; \
+	fi
+	@echo "Creating vault file from template..."
+	@cp group_vars/all.yml.example group_vars/all.yml
+	@echo "✓ Vault file created at group_vars/all.yml"
+	@echo "Edit the file with your secrets, then run 'make vault-encrypt'"
+	@echo ""
+	@echo "TIP: Use 'make vault-create-secure' to auto-generate strong passwords"
+
+vault-create-secure: ## Create vault file with auto-generated secure passwords
+	@if [ -f "group_vars/all.yml" ]; then \
+		echo "ERROR: group_vars/all.yml already exists"; \
+		echo "Use 'make vault-edit' to modify it or remove it first"; \
+		exit 1; \
+	fi
+	@echo "Creating vault file with auto-generated secure passwords..."
+	@$(VENV_ACTIVATE) && \
+	LOCAL_PASS=$$(python3 scripts/generate_secret.py 32) && \
+	PROD_PASS=$$(python3 scripts/generate_secret.py 32) && \
+	printf '%s\n' \
+		'---' \
+		'# Ansible Vault encrypted secrets' \
+		'# Generated on '"`date`" \
+		'# All variables prefixed with vault_ are referenced from group_vars files' \
+		'' \
+		'# Local environment database password (used by mattermost.yml)' \
+		"vault_local_db_password: \"$$LOCAL_PASS\"" \
+		'' \
+		'# Production environment database password (used by production.yml)' \
+		"vault_production_db_password: \"$$PROD_PASS\"" \
+		> group_vars/all.yml
+	@echo "✓ Vault file created at group_vars/all.yml with secure passwords"
+	@echo "Review the file with 'cat group_vars/all.yml', then run 'make vault-encrypt'"
+
+vault-decrypt: ## Decrypt the vault file (WARNING: removes encryption)
+	@if [ ! -f "group_vars/all.yml" ]; then \
+		echo "ERROR: group_vars/all.yml not found"; \
+		exit 1; \
+	fi
+	@echo "Decrypting vault file..."
+	@$(VENV_ACTIVATE) && ansible-vault decrypt group_vars/all.yml $(VAULT_PASS_ARG)
+
+vault-edit: ## Edit the encrypted vault file
+	@if [ ! -f "group_vars/all.yml" ]; then \
+		echo "ERROR: group_vars/all.yml not found"; \
+		echo "Run 'make vault-create' first"; \
+		exit 1; \
+	fi
+	@$(VENV_ACTIVATE) && ansible-vault edit group_vars/all.yml $(VAULT_PASS_ARG)
+
+vault-encrypt: ## Encrypt the vault file
+	@if [ ! -f "group_vars/all.yml" ]; then \
+		echo "ERROR: group_vars/all.yml not found"; \
+		echo "Run 'make vault-create' first"; \
+		exit 1; \
+	fi
+	@echo "Encrypting vault file..."
+	@$(VENV_ACTIVATE) && ansible-vault encrypt group_vars/all.yml $(VAULT_PASS_ARG)
+
+vault-rekey: ## Change the vault password
+	@if [ ! -f "group_vars/all.yml" ]; then \
+		echo "ERROR: group_vars/all.yml not found"; \
+		exit 1; \
+	fi
+	@echo "Changing vault password..."
+	@$(VENV_ACTIVATE) && ansible-vault rekey group_vars/all.yml $(VAULT_PASS_ARG)
+
+vault-view: ## View the encrypted vault file contents
+	@if [ ! -f "group_vars/all.yml" ]; then \
+		echo "ERROR: group_vars/all.yml not found"; \
+		exit 1; \
+	fi
+	@$(VENV_ACTIVATE) && ansible-vault view group_vars/all.yml $(VAULT_PASS_ARG)

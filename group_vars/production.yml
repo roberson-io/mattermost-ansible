@@ -6,7 +6,7 @@ postgresql_allow_remote: true
 postgresql_listen_addresses: "*"
 postgresql_db_name: mattermost
 postgresql_db_user: mmuser
-postgresql_db_password: "CHANGE_ME_PRODUCTION_PASSWORD"
+postgresql_db_password: "{{ vault_production_db_password }}"
 
 # Mattermost configuration
 mattermost_version: "10.12.0"
@@ -14,7 +14,7 @@ mattermost_db_host: "{{ hostvars[groups['database'][0]]['ansible_default_ipv4'][
 mattermost_db_port: 5432
 mattermost_db_name: mattermost
 mattermost_db_user: mmuser
-mattermost_db_password: "CHANGE_ME_PRODUCTION_PASSWORD"
+mattermost_db_password: "{{ vault_production_db_password }}"
 mattermost_site_url: "https://{{ nginx_server_name }}"
 
 # Nginx and TLS configuration
