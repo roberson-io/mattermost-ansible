@@ -1,4 +1,4 @@
-.PHONY: help ci clean clean-all deploy-local deploy-local-check deploy-production deploy-production-check install lint lint-fix orb-create-vms orb-create-vms-rocky orb-create-vms-ubuntu orb-delete-vms orb-delete-vms-rocky orb-delete-vms-ubuntu ping-local ping-production safety-check setup syntax-check test test-all test-certbot test-integration test-integration-check-vms test-integration-db-config test-mattermost test-mattermost-boards test-mattermost-calls test-mattermost-db-config test-mattermost-migrate-to-db test-mattermost-rocky test-nginx test-nginx-rocky test-postgresql test-postgresql-rocky test-rocky test-rtcd test-ubuntu test-unit vault-create vault-create-secure vault-decrypt vault-edit vault-encrypt vault-rekey vault-view
+.PHONY: help ci clean clean-all deploy-local deploy-local-check deploy-production deploy-production-check deploy-staging deploy-staging-check install lint lint-fix orb-create-vms orb-create-vms-rocky orb-create-vms-ubuntu orb-delete-vms orb-delete-vms-rocky orb-delete-vms-ubuntu ping-local ping-production ping-staging safety-check setup syntax-check test test-all test-certbot test-integration test-integration-check-vms test-integration-db-config test-mattermost test-mattermost-boards test-mattermost-calls test-mattermost-db-config test-mattermost-migrate-to-db test-mattermost-rocky test-nginx test-nginx-rocky test-postgresql test-postgresql-rocky test-rocky test-rtcd test-ubuntu test-unit vault-create vault-create-secure vault-decrypt vault-edit vault-encrypt vault-rekey vault-view
 
 # Default target
 .DEFAULT_GOAL := help
@@ -56,6 +56,20 @@ deploy-production: ## Deploy to production (inventory/production.ini)
 deploy-production-check: ## Dry-run deploy to production
 	@echo "Checking production deployment (dry-run)..."
 	@$(VENV_ACTIVATE) && ansible-playbook -i inventory/production.ini site.yml --check --diff $(VAULT_PASS_ARG)
+
+deploy-staging: ## Deploy to staging (inventory/staging.ini)
+	@echo "Deploying to staging environment..."
+	@read -p "Are you sure you want to deploy to STAGING? [y/N] " -n 1 -r; \
+	echo; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+		$(VENV_ACTIVATE) && ansible-playbook -i inventory/staging.ini site.yml $(VAULT_PASS_ARG); \
+	else \
+		echo "Deployment cancelled."; \
+	fi
+
+deploy-staging-check: ## Dry-run deploy to staging
+	@echo "Checking staging deployment (dry-run)..."
+	@$(VENV_ACTIVATE) && ansible-playbook -i inventory/staging.ini site.yml --check --diff $(VAULT_PASS_ARG)
 
 orb-create-vms: orb-create-vms-rocky ## Create OrbStack VMs for local testing (default: Rocky)
 
@@ -127,6 +141,9 @@ ping-local: ## Test connectivity to local VMs
 
 ping-production: ## Test connectivity to production servers
 	@$(VENV_ACTIVATE) && ansible all -i inventory/production.ini -m ping
+
+ping-staging: ## Test connectivity to staging servers
+	@$(VENV_ACTIVATE) && ansible all -i inventory/staging.ini -m ping
 
 safety-check: ## Check for known security vulnerabilities in dependencies
 	@echo "Checking for security vulnerabilities..."
@@ -243,6 +260,7 @@ vault-create-secure: ## Create vault file with auto-generated secure passwords
 	@echo "Creating vault file with auto-generated secure passwords..."
 	@$(VENV_ACTIVATE) && \
 	LOCAL_PASS=$$(python3 scripts/generate_secret.py 32) && \
+	STAGING_PASS=$$(python3 scripts/generate_secret.py 32) && \
 	PROD_PASS=$$(python3 scripts/generate_secret.py 32) && \
 	printf '%s\n' \
 		'---' \
@@ -252,6 +270,9 @@ vault-create-secure: ## Create vault file with auto-generated secure passwords
 		'' \
 		'# Local environment database password (used by mattermost.yml)' \
 		"vault_local_db_password: \"$$LOCAL_PASS\"" \
+		'' \
+		'# Staging environment database password (used by staging.yml)' \
+		"vault_staging_db_password: \"$$STAGING_PASS\"" \
 		'' \
 		'# Production environment database password (used by production.yml)' \
 		"vault_production_db_password: \"$$PROD_PASS\"" \

@@ -1,11 +1,11 @@
 # Mattermost Ansible Deployment
 
-Role-based Ansible playbooks to deploy Mattermost for both local development and production environments.
+Role-based Ansible playbooks to deploy Mattermost for local development, staging, and production environments.
 
 ## Features
 
 - **Multi-distribution support**: Works with Ubuntu, Debian, RHEL, Rocky Linux, CentOS, and Oracle Linux
-- **Multi-environment support**: Separate configurations for local VMs and production servers
+- **Multi-environment support**: Separate configurations for local, staging, and production
 - **Role-based architecture**: Modular, reusable components
 - **Production-ready**: Includes nginx reverse proxy and Let's Encrypt SSL/TLS
 - **Separate database tier**: PostgreSQL on dedicated host
@@ -57,6 +57,9 @@ Role-based Ansible playbooks to deploy Mattermost for both local development and
    # For local development
    cp inventory/local.ini.example inventory/local.ini
 
+   # For staging
+   cp inventory/staging.ini.example inventory/staging.ini
+
    # For production
    cp inventory/production.ini.example inventory/production.ini
    ```
@@ -86,18 +89,20 @@ Role-based Ansible playbooks to deploy Mattermost for both local development and
 ├── site.yml                      # Main playbook
 ├── inventory/
 │   ├── local.ini.example         # Local VM inventory template
+│   ├── staging.ini.example       # Staging server inventory template
 │   ├── production.ini.example    # Production server inventory template
 │   └── *.ini                     # Your custom inventory files (gitignored)
 ├── group_vars/
 │   ├── mattermost.yml            # Local environment variables
+│   ├── staging.yml               # Staging environment variables
 │   ├── production.yml            # Production environment variables
-│   ├── all.yml.example         # Vault template for secrets
-│   └── all.yml                 # Encrypted secrets (gitignored)
+│   ├── all.yml.example           # Vault template for secrets
+│   └── all.yml                   # Encrypted secrets (gitignored)
 └── roles/
     ├── postgresql/               # Database setup
     ├── mattermost/               # Mattermost application
-    ├── nginx/                    # Reverse proxy (production)
-    ├── certbot/                  # Let's Encrypt SSL (production)
+    ├── nginx/                    # Reverse proxy (staging/production)
+    ├── certbot/                  # Let's Encrypt SSL (staging/production)
     └── rtcd/                     # Real-time communication daemon (optional)
 ```
 
@@ -149,10 +154,34 @@ Role-based Ansible playbooks to deploy Mattermost for both local development and
 
 3. **Deploy:**
    ```bash
-   ansible-playbook -i inventory/production.ini site.yml
+   make deploy-production
    ```
 
 4. **Access:** https://mattermost.example.com
+
+### Staging Deployment
+
+Staging environments are useful for testing changes before deploying to production.
+
+1. **Create and configure your inventory file:**
+   ```bash
+   cp inventory/staging.ini.example inventory/staging.ini
+   ```
+
+   Edit `inventory/staging.ini` with your staging server details.
+
+2. **Update variables** in [group_vars/staging.yml](group_vars/staging.yml):
+   ```yaml
+   nginx_server_name: staging.mattermost.example.com
+   certbot_email: admin@example.com
+   ```
+
+3. **Deploy:**
+   ```bash
+   make deploy-staging
+   ```
+
+4. **Access:** https://staging.mattermost.example.com
 
 ## Configuration
 
@@ -484,8 +513,9 @@ ansible-vault decrypt group_vars/all.yml  # Decrypt vault (not recommended)
 
 ### Vault Variables
 
-The vault file defines secrets with the `vault_` prefix:
+The vault file ([group_vars/all.yml](group_vars/all.yml)) defines secrets with the `vault_` prefix for each environment:
 - `vault_local_db_password` - Database password for local/dev environment
+- `vault_staging_db_password` - Database password for staging environment
 - `vault_production_db_password` - Database password for production environment
 
 These are referenced in their respective group_vars files:
@@ -496,13 +526,19 @@ postgresql_db_password: "{{ vault_local_db_password }}"
 mattermost_db_password: "{{ vault_local_db_password }}"
 ```
 
+**In `group_vars/staging.yml`:**
+```yaml
+postgresql_db_password: "{{ vault_staging_db_password }}"
+mattermost_db_password: "{{ vault_staging_db_password }}"
+```
+
 **In `group_vars/production.yml`:**
 ```yaml
 postgresql_db_password: "{{ vault_production_db_password }}"
 mattermost_db_password: "{{ vault_production_db_password }}"
 ```
 
-**Note:** Both `postgresql_db_password` and `mattermost_db_password` reference the same vault variable because they represent the same password - the PostgreSQL role creates the database user with this password, and the Mattermost role uses it to connect.
+**Note:** Both `postgresql_db_password` and `mattermost_db_password` reference the same vault variable because they represent the same password - the PostgreSQL role creates the database user with this password, and the Mattermost role uses it to connect. Each environment has its own separate password for security isolation.
 
 ### Production Best Practices
 

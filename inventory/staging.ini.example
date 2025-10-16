@@ -1,0 +1,20 @@
+[database]
+# Replace with your staging database server
+db-staging.example.com ansible_user=ubuntu
+
+[app]
+# Replace with your staging app server
+app-staging.example.com ansible_user=ubuntu
+
+[rtcd]
+# Optional: Enable Mattermost Calls by uncommenting and configuring
+# rtcd-staging.example.com ansible_user=ubuntu
+
+[mattermost:children]
+database
+app
+rtcd
+
+[mattermost:vars]
+ansible_python_interpreter=/usr/bin/python3
+deployment_environment=staging
