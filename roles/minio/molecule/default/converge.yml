@@ -1,0 +1,7 @@
+---
+- name: Converge
+  hosts: minio
+  become: true
+  gather_facts: true
+  roles:
+    - minio

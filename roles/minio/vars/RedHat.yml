@@ -1,0 +1,8 @@
+---
+# RedHat/Rocky specific variables for MinIO role
+minio_required_packages:
+  - git
+  - make
+  - gcc
+  - wget
+  - curl

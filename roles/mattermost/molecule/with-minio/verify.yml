@@ -1,0 +1,126 @@
+---
+- name: Verify
+  hosts: app
+  gather_facts: false
+  tasks:
+    - name: Check Mattermost binary exists
+      ansible.builtin.stat:
+        path: /opt/mattermost/bin/mattermost
+      register: mm_bin
+      failed_when: not mm_bin.stat.exists
+
+    - name: Check Mattermost user exists
+      ansible.builtin.getent:
+        database: passwd
+        key: mattermost
+      register: mm_user
+      failed_when: mm_user.failed
+
+    - name: Check Mattermost service exists
+      ansible.builtin.stat:
+        path: /etc/systemd/system/mattermost.service
+      register: mm_service
+      failed_when: not mm_service.stat.exists
+
+    - name: Check Mattermost service is enabled
+      ansible.builtin.systemd:
+        name: mattermost
+        enabled: true
+      check_mode: true
+      register: svc_enabled
+      failed_when: svc_enabled is changed
+
+    - name: Check Mattermost environment file exists
+      ansible.builtin.stat:
+        path: /opt/mattermost/config/mattermost.environment
+      register: mm_env
+      failed_when: not mm_env.stat.exists
+
+    - name: Verify Mattermost directory ownership
+      ansible.builtin.stat:
+        path: /opt/mattermost
+      register: mm_dir
+      failed_when: mm_dir.stat.pw_name != 'mattermost'
+
+    - name: Wait for Mattermost to be ready
+      ansible.builtin.uri:
+        url: http://localhost:8065/api/v4/system/ping
+        status_code: 200
+      register: mm_ping
+      until: mm_ping.status == 200
+      retries: 30
+      delay: 2
+
+    - name: Get FileSettings configuration from mmctl
+      ansible.builtin.command: /opt/mattermost/bin/mmctl --local config show
+      become: true
+      become_user: mattermost
+      changed_when: false
+      register: mm_config
+
+    - name: Parse S3 configuration  # noqa: command-instead-of-shell
+      ansible.builtin.shell: >
+        set -o pipefail &&
+        /opt/mattermost/bin/mmctl --local config show | jq -r '.FileSettings.DriverName'
+      args:
+        executable: /bin/bash
+      become: true
+      become_user: mattermost
+      changed_when: false
+      register: s3_driver
+
+    - name: Verify S3 driver is configured
+      ansible.builtin.assert:
+        that:
+          - s3_driver.stdout == "amazons3"
+        fail_msg: "S3 driver not configured. Expected 'amazons3', got '{{ s3_driver.stdout }}'"
+        success_msg: "S3 driver is properly configured"
+
+    - name: Parse S3 endpoint configuration  # noqa: command-instead-of-shell
+      ansible.builtin.shell: >
+        set -o pipefail &&
+        /opt/mattermost/bin/mmctl --local config show | jq -r '.FileSettings.AmazonS3Endpoint'
+      args:
+        executable: /bin/bash
+      become: true
+      become_user: mattermost
+      changed_when: false
+      register: s3_endpoint
+
+    - name: Verify S3 endpoint is configured
+      ansible.builtin.assert:
+        that:
+          - s3_endpoint.stdout == "minio-server:9000"
+        fail_msg: "S3 endpoint not configured. Expected 'minio-server:9000', got '{{ s3_endpoint.stdout }}'"
+        success_msg: "S3 endpoint is properly configured"
+
+    - name: Parse S3 bucket configuration  # noqa: command-instead-of-shell
+      ansible.builtin.shell: >
+        set -o pipefail &&
+        /opt/mattermost/bin/mmctl --local config show | jq -r '.FileSettings.AmazonS3Bucket'
+      args:
+        executable: /bin/bash
+      become: true
+      become_user: mattermost
+      changed_when: false
+      register: s3_bucket
+
+    - name: Verify S3 bucket is configured
+      ansible.builtin.assert:
+        that:
+          - s3_bucket.stdout == "mattermost-test"
+        fail_msg: "S3 bucket not configured. Expected 'mattermost-test', got '{{ s3_bucket.stdout }}'"
+        success_msg: "S3 bucket is properly configured"
+
+    - name: Check MinIO connection in Mattermost logs
+      ansible.builtin.command: >
+        journalctl -u mattermost --since "5 minutes ago" --no-pager
+      changed_when: false
+      register: mm_logs
+
+    - name: Verify S3/MinIO connection in logs
+      ansible.builtin.assert:
+        that:
+          - "'Connection to S3 or minio is good' in mm_logs.stdout or 'amazons3' in mm_logs.stdout"
+        fail_msg: "No evidence of S3/MinIO connection in Mattermost logs"
+        success_msg: "S3/MinIO connection verified in logs"

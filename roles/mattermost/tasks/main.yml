@@ -560,6 +560,107 @@
   when: mattermost_license_file | length > 0
 
 #
+# S3/MinIO storage configuration (optional)
+#
+- name: Configure S3 storage driver
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set FileSettings.DriverName amazons3
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when: mattermost_enable_s3 | default(false)
+
+- name: Configure S3 endpoint
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set FileSettings.AmazonS3Endpoint {{ mattermost_s3_endpoint }}
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when: mattermost_enable_s3 | default(false)
+
+- name: Configure S3 bucket
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set FileSettings.AmazonS3Bucket {{ mattermost_s3_bucket }}
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when: mattermost_enable_s3 | default(false)
+
+- name: Configure S3 region
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set FileSettings.AmazonS3Region {{ mattermost_s3_region }}
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when: mattermost_enable_s3 | default(false)
+
+- name: Configure S3 access key ID
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set FileSettings.AmazonS3AccessKeyId {{ mattermost_s3_access_key_id }}
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when: mattermost_enable_s3 | default(false)
+  no_log: true
+
+- name: Configure S3 secret access key
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set FileSettings.AmazonS3SecretAccessKey {{ mattermost_s3_secret_access_key }}
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when: mattermost_enable_s3 | default(false)
+  no_log: true
+
+- name: Configure S3 SSL/TLS
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set FileSettings.AmazonS3SSL {{ mattermost_s3_secure | lower }}
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when: mattermost_enable_s3 | default(false)
+
+- name: Configure S3 path prefix
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set FileSettings.AmazonS3PathPrefix {{ mattermost_s3_path_prefix }}
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when:
+    - mattermost_enable_s3 | default(false)
+    - mattermost_s3_path_prefix | default('') | length > 0
+
+- name: Restart Mattermost to apply S3 configuration
+  ansible.builtin.systemd:
+    name: mattermost
+    state: restarted
+  become: true
+  when: mattermost_enable_s3 | default(false)
+
+- name: Wait for Mattermost to be ready after S3 config
+  ansible.builtin.uri:
+    url: "{{ mattermost_site_url }}/api/v4/system/ping"
+    status_code: 200
+  register: mattermost_s3_ping
+  until: mattermost_s3_ping.status == 200
+  retries: 30
+  delay: 2
+  when: mattermost_enable_s3 | default(false)
+
+- name: Display S3 configuration status
+  ansible.builtin.debug:
+    msg: "S3/MinIO storage configured - Endpoint: {{ mattermost_s3_endpoint }}, Bucket: {{ mattermost_s3_bucket }}"
+  when: mattermost_enable_s3 | default(false)
+
+#
 # Boards plugin installation (optional)
 #
 - name: Enable plugin uploads (required for Boards plugin)
@@ -637,11 +738,19 @@
     - mattermost_enable_boards | default(false)
     - mattermost_boards_needs_upgrade | default(false)
 
+- name: Set Boards download URL
+  ansible.builtin.set_fact:
+    mattermost_boards_url: "\
+      https://github.com/mattermost/mattermost-plugin-boards/releases/download/\
+      v{{ mattermost_boards_version }}/\
+      mattermost-plugin-boards-v{{ mattermost_boards_version }}-linux-amd64.tar.gz"
+  when:
+    - mattermost_enable_boards | default(false)
+    - mattermost_boards_needs_install | default(false) or mattermost_boards_needs_upgrade | default(false)
+
 - name: Download Boards plugin
   ansible.builtin.get_url:
-    url: >-
-      https://github.com/mattermost/mattermost-plugin-boards/releases/download/v{{ mattermost_boards_version }}/
-      mattermost-plugin-boards-v{{ mattermost_boards_version }}-linux-amd64.tar.gz
+    url: "{{ mattermost_boards_url }}"
     dest: "/tmp/mattermost-plugin-boards-v{{ mattermost_boards_version }}.tar.gz"
     mode: "0644"
     timeout: 120

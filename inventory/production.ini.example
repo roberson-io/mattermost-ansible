@@ -10,11 +10,16 @@ app.example.com ansible_user=ubuntu
 # Optional: Enable Mattermost Calls by uncommenting and configuring
 # rtcd.example.com ansible_user=ubuntu
 
-[mattermost:children]
+[minio]
+# Optional: Enable MinIO object storage by uncommenting and configuring
+# minio.example.com ansible_user=ubuntu
+
+[production:children]
 database
 app
 rtcd
+minio
 
-[mattermost:vars]
+[production:vars]
 ansible_python_interpreter=/usr/bin/python3
 deployment_environment=production

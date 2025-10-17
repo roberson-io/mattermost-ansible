@@ -71,50 +71,6 @@ deploy-staging-check: ## Dry-run deploy to staging
 	@echo "Checking staging deployment (dry-run)..."
 	@$(VENV_ACTIVATE) && ansible-playbook -i inventory/staging.ini site.yml --check --diff $(VAULT_PASS_ARG)
 
-orb-create-vms: orb-create-vms-rocky ## Create OrbStack VMs for local testing (default: Rocky)
-
-orb-create-vms-rocky: ## Create Rocky Linux 9 AMD64 VMs (mattermost-rocky, postgresql-rocky, rtcd-rocky)
-	@echo "Creating Rocky Linux 9 AMD64 VMs in OrbStack..."
-	@orb create -a amd64 rocky:9 postgresql-rocky || echo "postgresql-rocky may already exist"
-	@orb create -a amd64 rocky:9 mattermost-rocky || echo "mattermost-rocky may already exist"
-	@orb create -a amd64 rocky:9 rtcd-rocky || echo "rtcd-rocky may already exist"
-	@echo "✓ Rocky Linux 9 VMs created"
-	@echo ""
-	@echo "Update inventory/local.ini with:"
-	@echo "  [database]"
-	@echo "  $(USER)@postgresql-rocky@orb"
-	@echo "  [app]"
-	@echo "  $(USER)@mattermost-rocky@orb"
-	@echo "  [rtcd]"
-	@echo "  $(USER)@rtcd-rocky@orb"
-
-orb-create-vms-ubuntu: ## Create Ubuntu AMD64 VMs (mattermost-ubuntu, postgresql-ubuntu, rtcd-ubuntu)
-	@echo "Creating Ubuntu AMD64 VMs in OrbStack..."
-	@orb create -a amd64 ubuntu postgresql-ubuntu || echo "postgresql-ubuntu may already exist"
-	@orb create -a amd64 ubuntu mattermost-ubuntu || echo "mattermost-ubuntu may already exist"
-	@orb create -a amd64 ubuntu rtcd-ubuntu || echo "rtcd-ubuntu may already exist"
-	@echo "✓ Ubuntu VMs created"
-	@echo ""
-	@echo "Update inventory/local.ini with:"
-	@echo "  [database]"
-	@echo "  $(USER)@postgresql-ubuntu@orb"
-	@echo "  [app]"
-	@echo "  $(USER)@mattermost-ubuntu@orb"
-	@echo "  [rtcd]"
-	@echo "  $(USER)@rtcd-ubuntu@orb"
-
-orb-delete-vms: orb-delete-vms-rocky ## Delete OrbStack VMs (default: Rocky)
-
-orb-delete-vms-rocky: ## Delete Rocky Linux VMs
-	@echo "Deleting Rocky Linux VMs..."
-	@orb delete -f postgresql-rocky mattermost-rocky rtcd-rocky 2>/dev/null || true
-	@echo "✓ Rocky Linux VMs deleted"
-
-orb-delete-vms-ubuntu: ## Delete Ubuntu VMs
-	@echo "Deleting Ubuntu VMs..."
-	@orb delete -f postgresql-ubuntu mattermost-ubuntu rtcd-ubuntu 2>/dev/null || true
-	@echo "✓ Ubuntu VMs deleted"
-
 install: ## Install dependencies (creates venv if needed)
 	@if [ ! -d "venv" ]; then \
 		echo "Creating virtual environment..."; \
@@ -135,6 +91,56 @@ lint: ## Run linting (ansible-lint + yamllint)
 lint-fix: ## Auto-fix linting issues where possible
 	@echo "Auto-fixing linting issues..."
 	@$(VENV_ACTIVATE) && ansible-lint --fix site.yml roles/*/
+
+orb-create-vms: orb-create-vms-rocky ## Create OrbStack VMs for local testing (default: Rocky)
+
+orb-create-vms-rocky: ## Create Rocky Linux 9 AMD64 VMs (mattermost-rocky, postgresql-rocky, rtcd-rocky, minio-rocky)
+	@echo "Creating Rocky Linux 9 AMD64 VMs in OrbStack..."
+	@orb create -a amd64 rocky:9 postgresql-rocky || echo "postgresql-rocky may already exist"
+	@orb create -a amd64 rocky:9 mattermost-rocky || echo "mattermost-rocky may already exist"
+	@orb create -a amd64 rocky:9 rtcd-rocky || echo "rtcd-rocky may already exist"
+	@orb create -a amd64 rocky:9 minio-rocky || echo "minio-rocky may already exist"
+	@echo "✓ Rocky Linux 9 VMs created"
+	@echo ""
+	@echo "Update inventory/local.ini with:"
+	@echo "  [database]"
+	@echo "  $(USER)@postgresql-rocky@orb"
+	@echo "  [app]"
+	@echo "  $(USER)@mattermost-rocky@orb"
+	@echo "  [rtcd]"
+	@echo "  $(USER)@rtcd-rocky@orb"
+	@echo "  [minio]"
+	@echo "  $(USER)@minio-rocky@orb"
+
+orb-create-vms-ubuntu: ## Create Ubuntu AMD64 VMs (mattermost-ubuntu, postgresql-ubuntu, rtcd-ubuntu, minio-ubuntu)
+	@echo "Creating Ubuntu AMD64 VMs in OrbStack..."
+	@orb create -a amd64 ubuntu postgresql-ubuntu || echo "postgresql-ubuntu may already exist"
+	@orb create -a amd64 ubuntu mattermost-ubuntu || echo "mattermost-ubuntu may already exist"
+	@orb create -a amd64 ubuntu rtcd-ubuntu || echo "rtcd-ubuntu may already exist"
+	@orb create -a amd64 ubuntu minio-ubuntu || echo "minio-ubuntu may already exist"
+	@echo "✓ Ubuntu VMs created"
+	@echo ""
+	@echo "Update inventory/local.ini with:"
+	@echo "  [database]"
+	@echo "  $(USER)@postgresql-ubuntu@orb"
+	@echo "  [app]"
+	@echo "  $(USER)@mattermost-ubuntu@orb"
+	@echo "  [rtcd]"
+	@echo "  $(USER)@rtcd-ubuntu@orb"
+	@echo "  [minio]"
+	@echo "  $(USER)@minio-ubuntu@orb"
+
+orb-delete-vms: orb-delete-vms-rocky ## Delete OrbStack VMs (default: Rocky)
+
+orb-delete-vms-rocky: ## Delete Rocky Linux VMs
+	@echo "Deleting Rocky Linux VMs..."
+	@orb delete -f postgresql-rocky mattermost-rocky rtcd-rocky minio-rocky 2>/dev/null || true
+	@echo "✓ Rocky Linux VMs deleted"
+
+orb-delete-vms-ubuntu: ## Delete Ubuntu VMs
+	@echo "Deleting Ubuntu VMs..."
+	@orb delete -f postgresql-ubuntu mattermost-ubuntu rtcd-ubuntu minio-ubuntu 2>/dev/null || true
+	@echo "✓ Ubuntu VMs deleted"
 
 ping-local: ## Test connectivity to local VMs
 	@$(VENV_ACTIVATE) && ansible all -i inventory/local.ini -m ping
@@ -208,9 +214,17 @@ test-mattermost-migrate-to-db: ## Test file to database config migration
 	@echo "Testing migration from file to database config..."
 	@$(VENV_ACTIVATE) && cd roles/mattermost && molecule test -s migrate-to-db
 
+test-mattermost-minio: ## Test mattermost role with MinIO object storage
+	@echo "Testing mattermost role with MinIO..."
+	@$(VENV_ACTIVATE) && cd roles/mattermost && molecule test -s with-minio
+
 test-mattermost-rocky: ## Test mattermost role (Rocky Linux)
 	@echo "Testing mattermost role (Rocky Linux)..."
 	@$(VENV_ACTIVATE) && cd roles/mattermost && molecule test -s rocky
+
+test-minio: ## Test minio role (Ubuntu - default scenario)
+	@echo "Testing minio role (Ubuntu)..."
+	@$(VENV_ACTIVATE) && cd roles/minio && molecule test -s default
 
 test-nginx: ## Test nginx role (Ubuntu - default scenario)
 	@echo "Testing nginx role (Ubuntu)..."
@@ -235,7 +249,7 @@ test-rtcd: ## Test rtcd role (Ubuntu - default scenario)
 	@echo "Testing rtcd role (Ubuntu)..."
 	@$(VENV_ACTIVATE) && cd roles/rtcd && molecule test -s default
 
-test-ubuntu: test-postgresql test-mattermost test-mattermost-boards test-mattermost-calls test-nginx test-rtcd ## Run all Ubuntu tests (default scenarios)
+test-ubuntu: test-postgresql test-mattermost test-mattermost-boards test-mattermost-calls test-mattermost-minio test-nginx test-rtcd test-minio ## Run all Ubuntu tests (default scenarios)
 	@echo "✓ All Ubuntu tests completed"
 
 vault-create: ## Create vault file from example template

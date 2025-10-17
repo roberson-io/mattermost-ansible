@@ -33,6 +33,19 @@
   roles:
     - postgresql
 
+- name: Deploy MinIO Object Storage
+  hosts: minio
+  become: true
+  gather_facts: true
+  pre_tasks:
+    - name: Install Python SELinux support (RedHat/Rocky)
+      ansible.builtin.raw: dnf install -y python3-libselinux
+      when: ansible_os_family == "RedHat"
+      changed_when: false
+  roles:
+    - role: minio
+      when: enable_minio | default(false)
+
 - name: Deploy Mattermost Application
   hosts: app
   become: true
@@ -71,6 +84,22 @@
       when:
         - enable_calls | default(false)
         - groups.get('rtcd', []) | length > 0
+
+    - name: Gather facts from minio host
+      ansible.builtin.setup:
+      delegate_to: "{{ item }}"
+      delegate_facts: true
+      loop: "{{ groups.get('minio', []) }}"
+      when:
+        - enable_minio | default(false)
+        - groups.get('minio', []) | length > 0
+
+    - name: Set MinIO host from facts
+      ansible.builtin.set_fact:
+        mattermost_minio_host: "{{ hostvars[groups['minio'][0]]['ansible_default_ipv4']['address'] }}"
+      when:
+        - enable_minio | default(false)
+        - groups.get('minio', []) | length > 0
   roles:
     - mattermost
     - role: nginx
@@ -104,5 +133,13 @@
           - >-
             RTCD URL: {{ 'http://' + mattermost_rtcd_host + ':8045'
             if (enable_calls | default(false) and mattermost_rtcd_host is defined)
+            else 'Not configured' }}
+          - >-
+            MinIO URL: {{ 'http://' + mattermost_minio_host + ':9000'
+            if (enable_minio | default(false) and mattermost_minio_host is defined)
+            else 'Not configured' }}
+          - >-
+            MinIO Console: {{ 'http://' + mattermost_minio_host + ':9001'
+            if (enable_minio | default(false) and mattermost_minio_host is defined)
             else 'Not configured' }}
           - "Create your admin account on first visit"

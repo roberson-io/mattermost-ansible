@@ -1,0 +1,7 @@
+---
+# Debian/Ubuntu specific variables for MinIO role
+minio_required_packages:
+  - git
+  - build-essential
+  - wget
+  - curl

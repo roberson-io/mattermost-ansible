@@ -1,0 +1,85 @@
+---
+- name: Verify
+  hosts: minio
+  gather_facts: false
+  tasks:
+    - name: Check Go is installed
+      ansible.builtin.command: go version
+      changed_when: false
+      register: go_version
+      failed_when: go_version.rc != 0
+
+    - name: Check MinIO binary exists
+      ansible.builtin.stat:
+        path: /opt/minio/bin/minio
+      register: minio_bin
+      failed_when: not minio_bin.stat.exists
+
+    - name: Check MinIO binary is executable
+      ansible.builtin.stat:
+        path: /opt/minio/bin/minio
+      register: minio_bin_exec
+      failed_when: not minio_bin_exec.stat.executable
+
+    - name: Check minio user exists
+      ansible.builtin.getent:
+        database: passwd
+        key: minio
+      register: minio_user
+      failed_when: minio_user.failed
+
+    - name: Check MinIO service exists
+      ansible.builtin.stat:
+        path: /etc/systemd/system/minio.service
+      register: minio_service
+      failed_when: not minio_service.stat.exists
+
+    - name: Check MinIO service is enabled
+      ansible.builtin.systemd:
+        name: minio
+        enabled: true
+      check_mode: true
+      register: svc_enabled
+      failed_when: svc_enabled is changed
+
+    - name: Check MinIO service is running
+      ansible.builtin.systemd:
+        name: minio
+      register: minio_svc
+      failed_when: minio_svc.status.ActiveState != 'active'
+
+    - name: Check MinIO environment file exists
+      ansible.builtin.stat:
+        path: /etc/minio/minio.env
+      register: minio_env
+      failed_when: not minio_env.stat.exists
+
+    - name: Check MinIO data directory exists
+      ansible.builtin.stat:
+        path: /var/lib/minio
+      register: minio_data
+      failed_when: not minio_data.stat.exists
+
+    - name: Check MinIO data directory ownership
+      ansible.builtin.stat:
+        path: /var/lib/minio
+      register: minio_dir
+      failed_when: minio_dir.stat.pw_name != 'minio'
+
+    - name: Wait for MinIO API to be ready
+      ansible.builtin.uri:
+        url: http://localhost:9000/minio/health/live
+        status_code: 200
+      register: minio_health
+      until: minio_health.status == 200
+      retries: 30
+      delay: 2
+
+    - name: Check MinIO console is accessible
+      ansible.builtin.uri:
+        url: http://localhost:9001
+        status_code: 200
+      register: minio_console
+      until: minio_console.status == 200
+      retries: 10
+      delay: 2

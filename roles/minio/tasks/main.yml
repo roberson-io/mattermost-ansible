@@ -1,0 +1,217 @@
+---
+# minio role main tasks
+
+- name: Include OS-specific variables
+  ansible.builtin.include_vars: "{{ ansible_os_family }}.yml"
+
+- name: Update apt cache (Debian/Ubuntu)
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_os_family == "Debian"
+
+- name: Install required packages
+  ansible.builtin.package:
+    name: "{{ minio_required_packages }}"
+    state: present
+
+# Install Go
+- name: Check if Go is already installed
+  ansible.builtin.command: go version
+  register: minio_go_check
+  changed_when: false
+  failed_when: false
+
+- name: Get latest Go version
+  ansible.builtin.uri:
+    url: https://go.dev/VERSION?m=text
+    return_content: true
+  register: minio_go_latest_version
+  when: minio_go_check.rc != 0
+
+- name: Set Go version to install
+  ansible.builtin.set_fact:
+    minio_go_version_to_install: "{{ minio_go_latest_version.content.split('\n')[0] | regex_replace('^go', '') | trim }}"
+  when: minio_go_check.rc != 0
+
+- name: Download Go
+  ansible.builtin.get_url:
+    url: "https://go.dev/dl/go{{ minio_go_version_to_install }}.linux-amd64.tar.gz"
+    dest: "/tmp/go{{ minio_go_version_to_install }}.linux-amd64.tar.gz"
+    mode: "0644"
+  when: minio_go_check.rc != 0
+
+- name: Remove old Go installation
+  ansible.builtin.file:
+    path: /usr/local/go
+    state: absent
+  when: minio_go_check.rc != 0
+
+- name: Extract Go
+  ansible.builtin.unarchive:
+    src: "/tmp/go{{ minio_go_version_to_install }}.linux-amd64.tar.gz"
+    dest: /usr/local
+    remote_src: true
+  when: minio_go_check.rc != 0
+
+- name: Add Go to PATH
+  ansible.builtin.copy:
+    content: |
+      export PATH=$PATH:/usr/local/go/bin
+      export GOPATH=$HOME/go
+      export PATH=$PATH:$GOPATH/bin
+    dest: /etc/profile.d/go.sh
+    mode: "0644"
+  when: minio_go_check.rc != 0
+
+# Create MinIO user and directories
+- name: Create minio group
+  ansible.builtin.group:
+    name: "{{ minio_group }}"
+    system: true
+    state: present
+
+- name: Create minio user
+  ansible.builtin.user:
+    name: "{{ minio_user }}"
+    group: "{{ minio_group }}"
+    system: true
+    create_home: false
+    shell: /usr/sbin/nologin
+    state: present
+
+- name: Create minio directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ minio_user }}"
+    group: "{{ minio_group }}"
+    mode: "0755"
+  loop:
+    - "{{ minio_install_path }}"
+    - "{{ minio_install_path }}/bin"
+    - "{{ minio_config_path }}"
+    - "{{ minio_data_path }}"
+
+# Build MinIO from source
+- name: Check if MinIO binary exists
+  ansible.builtin.stat:
+    path: "{{ minio_install_path }}/bin/minio"
+  register: minio_binary
+
+- name: Clone MinIO repository
+  ansible.builtin.git:
+    repo: "{{ minio_repo_url }}"
+    dest: "{{ minio_build_path }}"
+    version: "{{ minio_version }}"
+    depth: 1
+  when: not minio_binary.stat.exists
+
+- name: Build MinIO from source
+  ansible.builtin.shell: |
+    export PATH=$PATH:/usr/local/go/bin
+    export GOPATH=$HOME/go
+    cd {{ minio_build_path }}
+    go build -o {{ minio_install_path }}/bin/minio
+  args:
+    creates: "{{ minio_install_path }}/bin/minio"
+  when: not minio_binary.stat.exists
+  notify: Restart minio
+
+- name: Set MinIO binary ownership and permissions
+  ansible.builtin.file:
+    path: "{{ minio_install_path }}/bin/minio"
+    owner: "{{ minio_user }}"
+    group: "{{ minio_group }}"
+    mode: "0755"
+
+- name: Clean up build directory
+  ansible.builtin.file:
+    path: "{{ minio_build_path }}"
+    state: absent
+  when: not minio_binary.stat.exists
+
+# Deploy MinIO configuration
+- name: Create MinIO environment file
+  ansible.builtin.template:
+    src: minio.env.j2
+    dest: "{{ minio_config_path }}/minio.env"
+    owner: "{{ minio_user }}"
+    group: "{{ minio_group }}"
+    mode: "0600"
+  notify: Restart minio
+
+- name: Deploy MinIO systemd service
+  ansible.builtin.template:
+    src: minio.service.j2
+    dest: /etc/systemd/system/minio.service
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart minio
+
+- name: Enable MinIO service
+  ansible.builtin.systemd:
+    name: minio
+    enabled: true
+    daemon_reload: true
+
+- name: Start MinIO service
+  ansible.builtin.systemd:
+    name: minio
+    state: started
+  register: minio_start
+  failed_when: false
+
+# Firewall configuration
+- name: Check if ufw is available (Debian/Ubuntu)
+  ansible.builtin.command: which ufw
+  register: minio_ufw_check
+  changed_when: false
+  failed_when: false
+  when: ansible_os_family == "Debian"
+
+- name: Allow MinIO API port through firewall (ufw - Debian/Ubuntu)
+  community.general.ufw:
+    rule: allow
+    port: "{{ minio_address.split(':')[1] }}"
+    proto: tcp
+  when:
+    - ansible_os_family == "Debian"
+    - minio_ufw_check.rc == 0
+
+- name: Allow MinIO Console port through firewall (ufw - Debian/Ubuntu)
+  community.general.ufw:
+    rule: allow
+    port: "{{ minio_console_address.split(':')[1] }}"
+    proto: tcp
+  when:
+    - ansible_os_family == "Debian"
+    - minio_ufw_check.rc == 0
+
+- name: Check if firewalld is available (RedHat)
+  ansible.builtin.command: which firewall-cmd
+  register: minio_firewalld_check
+  changed_when: false
+  failed_when: false
+  when: ansible_os_family == "RedHat"
+
+- name: Allow MinIO API port through firewall (firewalld - RedHat)
+  ansible.posix.firewalld:
+    port: "{{ minio_address.split(':')[1] }}/tcp"
+    permanent: true
+    state: enabled
+    immediate: true
+  when:
+    - ansible_os_family == "RedHat"
+    - minio_firewalld_check.rc == 0
+
+- name: Allow MinIO Console port through firewall (firewalld - RedHat)
+  ansible.posix.firewalld:
+    port: "{{ minio_console_address.split(':')[1] }}/tcp"
+    permanent: true
+    state: enabled
+    immediate: true
+  when:
+    - ansible_os_family == "RedHat"
+    - minio_firewalld_check.rc == 0

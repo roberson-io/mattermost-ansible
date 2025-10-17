@@ -1,0 +1,34 @@
+---
+# minio role default variables
+
+# Version and installation
+minio_version: "master"  # Git branch/tag to build from (use "master" for latest or specific release tag like "RELEASE.2025-10-15T17-29-55Z")
+minio_repo_url: "https://github.com/minio/minio.git"
+minio_install_path: /opt/minio
+minio_config_path: /etc/minio
+minio_data_path: /var/lib/minio
+minio_build_path: /tmp/minio-build
+minio_user: minio
+minio_group: minio
+
+# Go build requirements
+minio_go_version: "1.22"  # Minimum Go version required
+
+# Server Configuration
+minio_address: ":9000"
+minio_console_address: ":9001"
+
+# Security Configuration (REQUIRED - override in group_vars with vault variables)
+minio_root_user: "minioadmin"
+minio_root_password: "minioadmin_change_me"
+
+# Optional: Site region
+minio_site_region: "us-east-1"
+
+# Optional: Browser access
+minio_browser: "on"
+
+# Optional: TLS Configuration
+minio_enable_tls: false
+minio_cert_file: ""
+minio_key_file: ""
