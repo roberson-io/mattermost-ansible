@@ -3,17 +3,25 @@
   hosts: all
   gather_facts: true
   tasks:
-    - name: Check PostgreSQL is installed (RedHat package name)
-      ansible.builtin.package:
-        name: postgresql-server
-        state: present
-      check_mode: true
-      register: pkg_check
-      failed_when: pkg_check is changed
+    - name: Include role defaults
+      ansible.builtin.include_vars: "../../defaults/main.yml"
+
+    - name: Include OS-specific variables
+      ansible.builtin.include_vars: "../../vars/{{ ansible_os_family }}.yml"
+
+    - name: Check PostgreSQL version is installed
+      ansible.builtin.shell: |
+        set -o pipefail
+        /usr/pgsql-{{ postgresql_version }}/bin/postgres --version | awk '{print $3}' | cut -d. -f1
+      args:
+        executable: /bin/bash
+      register: installed_version
+      changed_when: false
+      failed_when: installed_version.stdout != postgresql_version
 
     - name: Check PostgreSQL service is running
       ansible.builtin.service:
-        name: postgresql
+        name: "{{ postgresql_service_name }}"
         state: started
       check_mode: true
       register: svc_check
@@ -21,13 +29,13 @@
 
     - name: Verify PostgreSQL was initialized (RedHat-specific check)
       ansible.builtin.stat:
-        path: /var/lib/pgsql/data/postgresql.conf
+        path: "{{ postgresql_config_dir }}/postgresql.conf"
       register: pg_conf
       failed_when: not pg_conf.stat.exists
 
     - name: Verify pg_hba.conf exists in RedHat location
       ansible.builtin.stat:
-        path: /var/lib/pgsql/data/pg_hba.conf
+        path: "{{ postgresql_config_dir }}/pg_hba.conf"
       register: pg_hba
       failed_when: not pg_hba.stat.exists
 
@@ -58,7 +66,7 @@
       failed_when: "'t' not in priv_check.stdout"
 
     - name: Verify remote connections are configured (if enabled)
-      ansible.builtin.shell: grep -q "host.*mattermost.*mmuser.*0.0.0.0/0" /var/lib/pgsql/data/pg_hba.conf
+      ansible.builtin.shell: grep -q "host.*mattermost.*mmuser.*0.0.0.0/0" {{ postgresql_config_dir }}/pg_hba.conf
       register: remote_check
       changed_when: false
       failed_when: remote_check.rc != 0

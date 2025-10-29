@@ -1,0 +1,34 @@
+---
+# This scenario tests PostgreSQL version upgrades
+# Step 1: Install PostgreSQL 14
+- name: Converge - Install PostgreSQL 14
+  hosts: all
+  become: true
+  gather_facts: true
+  vars:
+    postgresql_version: "14"
+  roles:
+    - postgresql
+
+# Step 2: Add some test data
+- name: Add test data to PostgreSQL 14
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Create test table
+      become: true
+      become_user: postgres
+      ansible.builtin.shell: |
+        psql -d mattermost -c "CREATE TABLE IF NOT EXISTS test_upgrade (id SERIAL PRIMARY KEY, data TEXT);"
+        psql -d mattermost -c "INSERT INTO test_upgrade (data) VALUES ('test_data_before_upgrade');"
+      changed_when: true
+
+# Step 3: Upgrade to PostgreSQL 16
+- name: Converge - Upgrade to PostgreSQL 16
+  hosts: all
+  become: true
+  gather_facts: true
+  vars:
+    postgresql_version: "16"
+  roles:
+    - postgresql

@@ -1,28 +1,224 @@
 ---
 - name: Include OS-specific variables
   ansible.builtin.include_vars: "{{ ansible_os_family }}.yml"
+
 - name: Update apt cache (Debian/Ubuntu)
   ansible.builtin.apt:
     update_cache: true
     cache_valid_time: 3600
   when: ansible_os_family == "Debian"
 
+# Add official PostgreSQL repositories
+- name: Install required packages for repository (Debian/Ubuntu)
+  ansible.builtin.apt:
+    name:
+      - gnupg
+      - ca-certificates
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: Add PostgreSQL APT key (Debian/Ubuntu)
+  ansible.builtin.get_url:
+    url: "{{ postgresql_apt_key_url }}"
+    dest: /usr/share/keyrings/postgresql-archive-keyring.asc
+    mode: '0644'
+  when: ansible_os_family == "Debian"
+
+- name: Add PostgreSQL APT repository (Debian/Ubuntu)
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/postgresql-archive-keyring.asc] {{ postgresql_apt_repository.split('deb ')[1] }}"
+    state: present
+    filename: pgdg
+    update_cache: true
+  when: ansible_os_family == "Debian"
+
+- name: Add PostgreSQL RPM repository (RedHat)
+  ansible.builtin.dnf:
+    name: "{{ postgresql_rpm_repo_url }}"
+    state: present
+    disable_gpg_check: true
+  when: ansible_os_family == "RedHat"
+
+- name: Disable built-in PostgreSQL module (RedHat 8+)
+  ansible.builtin.shell: dnf -qy module disable postgresql
+  args:
+    executable: /bin/bash
+  changed_when: false
+  failed_when: false
+  when:
+    - ansible_os_family == "RedHat"
+    - ansible_distribution_major_version | int >= 8
+
+# Check for existing PostgreSQL installation
+- name: Check if PostgreSQL is already installed (Debian/Ubuntu)
+  ansible.builtin.shell: |
+    set -o pipefail
+    psql --version 2>/dev/null | awk '{print $3}' | cut -d. -f1
+  args:
+    executable: /bin/bash
+  register: postgresql_current_version_debian
+  changed_when: false
+  failed_when: false
+  when: ansible_os_family == "Debian"
+
+- name: Check if PostgreSQL is already installed (RedHat)
+  ansible.builtin.shell: |
+    set -o pipefail
+    /usr/pgsql-*/bin/postgres --version 2>/dev/null | awk '{print $3}' | cut -d. -f1 | head -1
+  args:
+    executable: /bin/bash
+  register: postgresql_current_version_redhat
+  changed_when: false
+  failed_when: false
+  when: ansible_os_family == "RedHat"
+
+- name: Set PostgreSQL version facts
+  ansible.builtin.set_fact:
+    postgresql_installed_version: >-
+      {{ (postgresql_current_version_debian.stdout | default('')) if ansible_os_family == 'Debian'
+      else (postgresql_current_version_redhat.stdout | default('')) }}
+    postgresql_is_installed: >-
+      {{ (postgresql_current_version_debian.rc == 0 if ansible_os_family == 'Debian'
+      else postgresql_current_version_redhat.rc == 0) }}
+
+- name: Set version comparison facts
+  ansible.builtin.set_fact:
+    postgresql_needs_install: "{{ not postgresql_is_installed }}"
+    postgresql_needs_upgrade: >-
+      {{ postgresql_is_installed and postgresql_installed_version != postgresql_version }}
+
+- name: Display version information
+  ansible.builtin.debug:
+    msg:
+      - "Current PostgreSQL version: {{ postgresql_installed_version | default('none') }}"
+      - "Desired PostgreSQL version: {{ postgresql_version }}"
+      - >-
+        Action needed: {{ 'fresh install' if postgresql_needs_install
+        else ('upgrade/downgrade' if postgresql_needs_upgrade
+        else 'none (already at desired version)') }}
+
+# Backup and upgrade/downgrade logic
+- name: Handle PostgreSQL upgrade/downgrade
+  when: postgresql_needs_upgrade
+  block:
+    - name: Stop PostgreSQL service
+      ansible.builtin.systemd:
+        name: "{{ 'postgresql' if ansible_os_family == 'Debian' else 'postgresql-' + postgresql_installed_version }}"
+        state: stopped
+
+    - name: Ensure backup directory exists
+      ansible.builtin.file:
+        path: "{{ postgresql_backup_dir }}"
+        state: directory
+        owner: postgres
+        group: postgres
+        mode: "0750"
+
+    - name: Backup all databases before upgrade/downgrade
+      ansible.builtin.command:
+        cmd: >
+          su - postgres -c "/usr/{{ 'lib/postgresql/' + postgresql_installed_version if ansible_os_family == 'Debian'
+          else 'pgsql-' + postgresql_installed_version }}/bin/pg_dumpall >
+          {{ postgresql_backup_dir }}/postgresql-all-backup-{{ ansible_date_time.iso8601_basic_short }}.sql"
+      changed_when: true
+      register: postgresql_backup_result
+
+    - name: Display backup location
+      ansible.builtin.debug:
+        msg: "PostgreSQL backup created: {{ postgresql_backup_dir }}/postgresql-all-backup-{{ ansible_date_time.iso8601_basic_short }}.sql"
+
+    - name: Backup PostgreSQL data directory (Debian/Ubuntu)
+      ansible.builtin.copy:
+        src: "/var/lib/postgresql/{{ postgresql_installed_version }}/"
+        dest: "/var/lib/postgresql/{{ postgresql_installed_version }}-backup-{{ ansible_date_time.date }}"
+        remote_src: true
+        owner: postgres
+        group: postgres
+        mode: preserve
+      when: ansible_os_family == "Debian"
+      register: postgresql_debian_backup
+
+    - name: Backup PostgreSQL data directory (RedHat)
+      ansible.builtin.copy:
+        src: "/var/lib/pgsql/{{ postgresql_installed_version }}/"
+        dest: "/var/lib/pgsql/{{ postgresql_installed_version }}-backup-{{ ansible_date_time.date }}"
+        remote_src: true
+        owner: postgres
+        group: postgres
+        mode: preserve
+      when: ansible_os_family == "RedHat"
+      register: postgresql_redhat_backup
+
+# Install PostgreSQL packages
 - name: Install PostgreSQL packages
   ansible.builtin.package:
     name: "{{ postgresql_packages }}"
     state: present
 
 - name: Initialize PostgreSQL database (RedHat)
-  ansible.builtin.command: postgresql-setup --initdb
+  ansible.builtin.command: "/usr/pgsql-{{ postgresql_version }}/bin/postgresql-{{ postgresql_version }}-setup initdb"
   args:
     creates: "{{ postgresql_config_dir }}/postgresql.conf"
-  when: ansible_os_family == "RedHat" and postgresql_needs_initdb | default(false)
+  when:
+    - ansible_os_family == "RedHat"
+    - postgresql_needs_install
 
+# Data migration for upgrades
+- name: Perform data migration after upgrade
+  when:
+    - postgresql_needs_upgrade
+    - postgresql_backup_result is defined
+  block:
+    - name: Initialize new PostgreSQL cluster (RedHat)
+      ansible.builtin.command: "/usr/pgsql-{{ postgresql_version }}/bin/postgresql-{{ postgresql_version }}-setup initdb"
+      args:
+        creates: "{{ postgresql_config_dir }}/postgresql.conf"
+      when: ansible_os_family == "RedHat"
+
+    - name: Ensure new PostgreSQL cluster exists (Debian/Ubuntu)
+      ansible.builtin.command: "/usr/lib/postgresql/{{ postgresql_version }}/bin/initdb -D /var/lib/postgresql/{{ postgresql_version }}/main"
+      become: true
+      become_user: postgres
+      args:
+        creates: "/var/lib/postgresql/{{ postgresql_version }}/main/PG_VERSION"
+      when: ansible_os_family == "Debian"
+
+    - name: Start new PostgreSQL service temporarily for restoration
+      ansible.builtin.systemd:
+        name: "{{ postgresql_service_name }}"
+        state: started
+        enabled: true
+
+    - name: Wait for PostgreSQL to be ready
+      ansible.builtin.wait_for:
+        port: 5432
+        delay: 2
+        timeout: 30
+
+    - name: Restore databases from backup
+      ansible.builtin.shell: >
+        su - postgres -c "psql -f {{ postgresql_backup_dir }}/postgresql-all-backup-{{ ansible_date_time.iso8601_basic_short }}.sql postgres"
+      changed_when: true
+      register: postgresql_restore_result
+
+    - name: Display restoration result
+      ansible.builtin.debug:
+        msg:
+          - "=========================================="
+          - "PostgreSQL upgrade/downgrade complete!"
+          - "Previous version: {{ postgresql_installed_version }}"
+          - "New version: {{ postgresql_version }}"
+          - "Backup location: {{ postgresql_backup_dir }}/postgresql-all-backup-{{ ansible_date_time.iso8601_basic_short }}.sql"
+          - "Data backup: {{ postgresql_debian_backup.dest | default(postgresql_redhat_backup.dest | default('N/A')) }}"
+          - "=========================================="
+
+# Start PostgreSQL for fresh installs
 - name: Start and enable PostgreSQL
   ansible.builtin.systemd:
     name: "{{ postgresql_service_name }}"
     state: started
     enabled: true
+  when: postgresql_needs_install
 
 - name: Find PostgreSQL config file (Debian/Ubuntu)
   ansible.builtin.find:
@@ -68,6 +264,15 @@
     state: present
   notify: Restart postgresql
   when: postgresql_allow_remote
+
+- name: Flush handlers to ensure PostgreSQL is restarted
+  ansible.builtin.meta: flush_handlers
+
+- name: Wait for PostgreSQL to be ready after configuration
+  ansible.builtin.wait_for:
+    port: 5432
+    delay: 2
+    timeout: 30
 
 - name: Create Mattermost database
   become: true

@@ -1,0 +1,73 @@
+---
+- name: Verify upgrade
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: Include OS-specific variables
+      ansible.builtin.include_vars: "../../vars/{{ ansible_os_family }}.yml"
+
+    - name: Set expected version
+      ansible.builtin.set_fact:
+        expected_version: "16"
+
+    - name: Check PostgreSQL 16 is installed
+      ansible.builtin.shell: |
+        set -o pipefail
+        /usr/pgsql-16/bin/postgres --version | awk '{print $3}' | cut -d. -f1
+      args:
+        executable: /bin/bash
+      register: installed_version
+      changed_when: false
+      failed_when: installed_version.stdout != expected_version
+
+    - name: Check PostgreSQL 16 service is running
+      ansible.builtin.service:
+        name: postgresql-16
+        state: started
+      check_mode: true
+      register: svc_check
+      failed_when: svc_check is changed
+
+    - name: Verify database still exists after upgrade
+      become: true
+      become_user: postgres
+      ansible.builtin.command: psql -lqt
+      register: db_list
+      changed_when: false
+      failed_when: "'mattermost' not in db_list.stdout"
+
+    - name: Verify database user still exists after upgrade
+      become: true
+      become_user: postgres
+      ansible.builtin.command: psql -t -c "SELECT 1 FROM pg_roles WHERE rolname='mmuser'"
+      register: user_check
+      changed_when: false
+      failed_when: "'1' not in user_check.stdout"
+
+    - name: Verify test data survived the upgrade
+      become: true
+      become_user: postgres
+      ansible.builtin.command: psql -d mattermost -t -c "SELECT data FROM test_upgrade WHERE data='test_data_before_upgrade'"
+      register: data_check
+      changed_when: false
+      failed_when: "'test_data_before_upgrade' not in data_check.stdout"
+
+    - name: Verify backup was created
+      ansible.builtin.find:
+        paths: /var/backups/postgresql
+        patterns: "postgresql-all-backup-*.sql"
+      register: backup_files
+      failed_when: backup_files.matched == 0
+
+    - name: Verify old data directory backup exists
+      ansible.builtin.stat:
+        path: /var/lib/pgsql/14-backup-{{ ansible_date_time.date }}
+      register: old_data_backup
+      failed_when: not old_data_backup.stat.exists
+
+    - name: Display upgrade verification results
+      ansible.builtin.debug:
+        msg:
+          - "PostgreSQL successfully upgraded from 14 to 16"
+          - "All data preserved during upgrade"
+          - "Backup files created: {{ backup_files.matched }}"

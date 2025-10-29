@@ -1,19 +1,27 @@
 ---
 - name: Verify
   hosts: all
-  gather_facts: false
+  gather_facts: true
   tasks:
-    - name: Check PostgreSQL is installed
-      ansible.builtin.package:
-        name: postgresql
-        state: present
-      check_mode: true
-      register: pkg_check
-      failed_when: pkg_check is changed
+    - name: Include role defaults
+      ansible.builtin.include_vars: "../../defaults/main.yml"
+
+    - name: Include OS-specific variables
+      ansible.builtin.include_vars: "../../vars/{{ ansible_os_family }}.yml"
+
+    - name: Check PostgreSQL version is installed
+      ansible.builtin.shell: |
+        set -o pipefail
+        psql --version | awk '{print $3}' | cut -d. -f1
+      args:
+        executable: /bin/bash
+      register: installed_version
+      changed_when: false
+      failed_when: installed_version.stdout != postgresql_version
 
     - name: Check PostgreSQL service is running
       ansible.builtin.service:
-        name: postgresql
+        name: "{{ postgresql_service_name }}"
         state: started
       check_mode: true
       register: svc_check

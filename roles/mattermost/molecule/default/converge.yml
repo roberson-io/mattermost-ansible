@@ -3,5 +3,7 @@
   hosts: app
   become: true
   gather_facts: true
+  vars:
+    mattermost_skip_db_backup: true  # Skip database backup in molecule tests
   roles:
     - mattermost

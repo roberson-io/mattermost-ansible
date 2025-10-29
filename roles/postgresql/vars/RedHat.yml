@@ -1,12 +1,16 @@
 ---
 # RedHat/CentOS/Rocky/Oracle Linux-specific variables
 postgresql_packages:
-  - postgresql-server
-  - postgresql-contrib
+  - "postgresql{{ postgresql_version }}-server"
+  - "postgresql{{ postgresql_version }}-contrib"
   - python3-psycopg2
 
-postgresql_service_name: postgresql
-postgresql_config_dir: "/var/lib/pgsql/data"
-postgresql_config_file: "/var/lib/pgsql/data/postgresql.conf"
-postgresql_hba_file: "/var/lib/pgsql/data/pg_hba.conf"
+postgresql_service_name: "postgresql-{{ postgresql_version }}"
+postgresql_config_dir: "/var/lib/pgsql/{{ postgresql_version }}/data"
+postgresql_config_file: "/var/lib/pgsql/{{ postgresql_version }}/data/postgresql.conf"
+postgresql_hba_file: "/var/lib/pgsql/{{ postgresql_version }}/data/pg_hba.conf"
 postgresql_needs_initdb: true
+
+# PostgreSQL RPM repository
+postgresql_rpm_repo_url: >-
+  https://download.postgresql.org/pub/repos/yum/reporpms/EL-{{ ansible_distribution_major_version }}-x86_64/pgdg-redhat-repo-latest.noarch.rpm

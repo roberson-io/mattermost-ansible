@@ -1,11 +1,15 @@
 ---
 # Debian/Ubuntu-specific variables
 postgresql_packages:
-  - postgresql
-  - postgresql-contrib
+  - "postgresql-{{ postgresql_version }}"
+  - "postgresql-contrib-{{ postgresql_version }}"
   - python3-psycopg2
 
 postgresql_service_name: postgresql
 postgresql_config_dir: "/etc/postgresql"
 postgresql_config_file_pattern: "*/main/postgresql.conf"
 postgresql_hba_file_pattern: "*/main/pg_hba.conf"
+
+# PostgreSQL APT repository
+postgresql_apt_key_url: "https://www.postgresql.org/media/keys/ACCC4CF8.asc"
+postgresql_apt_repository: "deb http://apt.postgresql.org/pub/repos/apt {{ ansible_distribution_release }}-pgdg main"

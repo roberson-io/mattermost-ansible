@@ -2,6 +2,7 @@
 # Staging environment configuration
 
 # PostgreSQL configuration
+postgresql_version: "16"  # Note: Mattermost v11.0+ requires PostgreSQL 14 or higher
 postgresql_allow_remote: true
 postgresql_listen_addresses: "*"
 postgresql_db_name: mattermost

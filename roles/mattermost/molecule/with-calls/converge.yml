@@ -1,6 +1,8 @@
 ---
 - name: Converge
   hosts: app
+  vars:
+    mattermost_skip_db_backup: true  # Skip database backup in molecule tests
   become: true
   gather_facts: true
   roles:

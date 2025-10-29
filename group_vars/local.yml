@@ -2,6 +2,7 @@
 # Local development environment configuration
 
 # PostgreSQL configuration
+postgresql_version: "16"  # Note: Mattermost v11.0+ requires PostgreSQL 14 or higher
 postgresql_allow_remote: true
 postgresql_listen_addresses: "*"
 postgresql_db_name: mattermost
@@ -17,7 +18,7 @@ postgresql_db_password: "{{ vault_local_db_password }}"
 # - "database": Config stored in database (recommended for HA clusters)
 mattermost_config_storage: "database"
 
-mattermost_version: "10.12.1"
+mattermost_version: "11.0.4"
 mattermost_db_port: 5432
 mattermost_db_name: mattermost
 mattermost_db_user: mmuser
@@ -43,17 +44,17 @@ mattermost_boards_version: "9.1.7"
 
 # MinIO Object Storage configuration (optional)
 # Enable MinIO by setting enable_minio to true and configuring a minio host in inventory
-enable_minio: true
-mattermost_enable_s3: true
-mattermost_s3_endpoint: "{{ mattermost_minio_host | default('localhost') }}:9000"
-mattermost_s3_bucket: "mattermost"
-mattermost_s3_region: "us-east-1"
-mattermost_s3_access_key_id: "{{ vault_minio_access_key }}"
-mattermost_s3_secret_access_key: "{{ vault_minio_secret_key }}"
-mattermost_s3_secure: false  # Set to true if using TLS
+# enable_minio: true
+# mattermost_enable_s3: true
+# mattermost_s3_endpoint: "{{ mattermost_minio_host | default('localhost') }}:9000"
+# mattermost_s3_bucket: "mattermost"
+# mattermost_s3_region: "us-east-1"
+# mattermost_s3_access_key_id: "{{ vault_minio_access_key }}"
+# mattermost_s3_secret_access_key: "{{ vault_minio_secret_key }}"
+# mattermost_s3_secure: false  # Set to true if using TLS
 # MinIO server configuration (when enable_minio is true):
-minio_root_user: "{{ vault_minio_access_key }}"
-minio_root_password: "{{ vault_minio_secret_key }}"
+# minio_root_user: "{{ vault_minio_access_key }}"
+# minio_root_password: "{{ vault_minio_secret_key }}"
 
 # No nginx/TLS for local development
 use_nginx: false

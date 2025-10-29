@@ -38,7 +38,11 @@
 - name: Set version comparison facts
   ansible.builtin.set_fact:
     mattermost_needs_install: "{{ not mattermost_binary.stat.exists }}"
-    mattermost_needs_upgrade: "{{ mattermost_binary.stat.exists and mattermost_current_version.stdout != mattermost_version }}"
+    mattermost_needs_upgrade: >-
+      {{ mattermost_binary.stat.exists and
+         mattermost_current_version.stdout is defined and
+         mattermost_current_version.stdout | length > 0 and
+         mattermost_current_version.stdout != mattermost_version }}
     mattermost_installed_version: "{{ mattermost_current_version.stdout | default('none') }}"
 
 - name: Display version information
@@ -69,6 +73,7 @@
   when:
     - mattermost_needs_upgrade
     - groups.get('database', []) | length > 0
+    - not (mattermost_skip_db_backup | default(false))
 
 - name: Backup database before upgrade/downgrade
   community.postgresql.postgresql_db:
@@ -82,8 +87,9 @@
   when:
     - mattermost_needs_upgrade
     - groups.get('database', []) | length > 0
+    - not (mattermost_skip_db_backup | default(false))
 
-- name: Backup Mattermost application directory (following official naming convention)
+- name: Backup Mattermost application directory
   ansible.builtin.copy:
     src: "{{ mattermost_install_path }}/"
     dest: "{{ mattermost_install_path }}-back-{{ ansible_date_time.date }}-{{ ansible_date_time.hour }}-{{ ansible_date_time.minute }}"
@@ -124,7 +130,7 @@
     remote_src: true
   when: mattermost_needs_upgrade
 
-- name: Remove old Mattermost files (preserving data directories per official docs)
+- name: Remove old Mattermost files
   ansible.builtin.shell: |
     cd {{ mattermost_install_path }}
     sudo find . -mindepth 1 -maxdepth 1 \
@@ -443,6 +449,9 @@
     name: mattermost
     enabled: true
 
+- name: Flush handlers before starting Mattermost
+  ansible.builtin.meta: flush_handlers
+
 - name: Start Mattermost service
   ansible.builtin.systemd:
     name: mattermost
@@ -663,6 +672,16 @@
 #
 # Boards plugin installation (optional)
 #
+- name: Wait for Mattermost to be ready (for Boards plugin)
+  ansible.builtin.uri:
+    url: "{{ mattermost_site_url }}/api/v4/system/ping"
+    status_code: 200
+  register: mattermost_boards_ping
+  until: mattermost_boards_ping.status == 200
+  retries: 30
+  delay: 2
+  when: mattermost_enable_boards | default(false)
+
 - name: Enable plugin uploads (required for Boards plugin)
   ansible.builtin.command:
     cmd: >

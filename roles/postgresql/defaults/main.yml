@@ -1,5 +1,9 @@
 ---
 # PostgreSQL role default variables
+# PostgreSQL version to install (e.g., "14", "15", "16")
+# Note: Mattermost v11.0+ requires PostgreSQL 14 or higher
+postgresql_version: "16"
+
 postgresql_listen_addresses: "*"
 postgresql_max_connections: 100
 
@@ -11,3 +15,6 @@ postgresql_db_password: "mmuser_password_change_me"
 
 # Allow remote connections (set to false for local deployments)
 postgresql_allow_remote: true
+
+# Backup directory for PostgreSQL upgrades
+postgresql_backup_dir: "/var/backups/postgresql"
