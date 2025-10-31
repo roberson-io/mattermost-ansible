@@ -8,7 +8,10 @@ vault_password.txt
 *.yml.*~
 *.yaml.*~
 .ansible/
-group_vars/all.yml
+
+# Group vars files (keep .example templates)
+group_vars/*.yml
+!group_vars/*.yml.example
 
 # Inventory files (keep .example templates)
 inventory/*.ini
