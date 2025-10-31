@@ -1,0 +1,69 @@
+---
+dependency:
+  enabled: false
+  name: galaxy
+
+driver:
+  name: docker
+
+platforms:
+  - name: keycloak-db
+    image: postgres:16
+    env:
+      POSTGRES_PASSWORD: keycloak_test_password
+      POSTGRES_USER: keycloak
+      POSTGRES_DB: keycloak
+    command: ""
+    pre_build_image: true
+    groups:
+      - database
+
+  - name: keycloak-app
+    image: geerlingguy/docker-ubuntu2204-ansible:latest
+    command: ""
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+    groups:
+      - keycloak
+
+provisioner:
+  name: ansible
+  inventory:
+    group_vars:
+      keycloak:
+        keycloak_db_host: keycloak-db
+        keycloak_db_port: 5432
+        keycloak_db_name: keycloak
+        keycloak_db_user: keycloak
+        keycloak_db_password: keycloak_test_password
+        vault_keycloak_admin_password: admin_test_password
+        vault_keycloak_db_password: keycloak_test_password
+  config_options:
+    defaults:
+      interpreter_python: auto_silent
+      callback_whitelist: profile_tasks, timer, yaml
+      host_key_checking: false
+      roles_path: "${MOLECULE_PROJECT_DIRECTORY}/.."
+    ssh_connection:
+      pipelining: false
+
+verifier:
+  name: ansible
+
+scenario:
+  name: default
+  test_sequence:
+    - dependency
+    - cleanup
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    - idempotence
+    - verify
+    - cleanup
+    - destroy

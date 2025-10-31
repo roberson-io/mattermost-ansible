@@ -1,0 +1,7 @@
+---
+# RedHat/Rocky/CentOS specific variables for keycloak role
+
+keycloak_required_packages:
+  - curl
+  - tar
+  - java-17-openjdk-headless

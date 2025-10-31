@@ -92,55 +92,109 @@ lint-fix: ## Auto-fix linting issues where possible
 	@echo "Auto-fixing linting issues..."
 	@$(VENV_ACTIVATE) && ansible-lint --fix site.yml roles/*/
 
-orb-create-vms: orb-create-vms-rocky ## Create OrbStack VMs for local testing (default: Rocky)
+orb-create-vm-keycloak-rocky: ## Create Keycloak VM (Rocky Linux 9)
+	@echo "Creating Keycloak VM (Rocky Linux 9)..."
+	@orb create -a amd64 rocky:9 keycloak-rocky || echo "keycloak-rocky may already exist"
+	@echo "✓ Keycloak VM created. Add to inventory: [keycloak] $(USER)@keycloak-rocky@orb"
 
-orb-create-vms-rocky: ## Create Rocky Linux 9 AMD64 VMs (mattermost-rocky, postgresql-rocky, rtcd-rocky, minio-rocky)
-	@echo "Creating Rocky Linux 9 AMD64 VMs in OrbStack..."
+orb-create-vm-keycloak-ubuntu: ## Create Keycloak VM (Ubuntu)
+	@echo "Creating Keycloak VM (Ubuntu)..."
+	@orb create -a amd64 ubuntu keycloak-ubuntu || echo "keycloak-ubuntu may already exist"
+	@echo "✓ Keycloak VM created. Add to inventory: [keycloak] $(USER)@keycloak-ubuntu@orb"
+
+orb-create-vm-minio-rocky: ## Create MinIO VM (Rocky Linux 9)
+	@echo "Creating MinIO VM (Rocky Linux 9)..."
+	@orb create -a amd64 rocky:9 minio-rocky || echo "minio-rocky may already exist"
+	@echo "✓ MinIO VM created. Add to inventory: [minio] $(USER)@minio-rocky@orb"
+
+orb-create-vm-minio-ubuntu: ## Create MinIO VM (Ubuntu)
+	@echo "Creating MinIO VM (Ubuntu)..."
+	@orb create -a amd64 ubuntu minio-ubuntu || echo "minio-ubuntu may already exist"
+	@echo "✓ MinIO VM created. Add to inventory: [minio] $(USER)@minio-ubuntu@orb"
+
+orb-create-vm-rtcd-rocky: ## Create RTCD VM (Rocky Linux 9)
+	@echo "Creating RTCD VM (Rocky Linux 9)..."
+	@orb create -a amd64 rocky:9 rtcd-rocky || echo "rtcd-rocky may already exist"
+	@echo "✓ RTCD VM created. Add to inventory: [rtcd] $(USER)@rtcd-rocky@orb"
+
+orb-create-vm-rtcd-ubuntu: ## Create RTCD VM (Ubuntu)
+	@echo "Creating RTCD VM (Ubuntu)..."
+	@orb create -a amd64 ubuntu rtcd-ubuntu || echo "rtcd-ubuntu may already exist"
+	@echo "✓ RTCD VM created. Add to inventory: [rtcd] $(USER)@rtcd-ubuntu@orb"
+
+orb-create-vms: orb-create-vms-rocky ## Create core OrbStack VMs (default: Rocky)
+
+orb-create-vms-all-rocky: orb-create-vms-rocky orb-create-vm-rtcd-rocky orb-create-vm-minio-rocky orb-create-vm-keycloak-rocky ## Create all Rocky VMs including optional services
+
+orb-create-vms-all-ubuntu: orb-create-vms-ubuntu orb-create-vm-rtcd-ubuntu orb-create-vm-minio-ubuntu orb-create-vm-keycloak-ubuntu ## Create all Ubuntu VMs including optional services
+
+orb-create-vms-rocky: ## Create core Rocky Linux 9 AMD64 VMs (postgresql, mattermost only)
+	@echo "Creating core Rocky Linux 9 AMD64 VMs..."
 	@orb create -a amd64 rocky:9 postgresql-rocky || echo "postgresql-rocky may already exist"
 	@orb create -a amd64 rocky:9 mattermost-rocky || echo "mattermost-rocky may already exist"
-	@orb create -a amd64 rocky:9 rtcd-rocky || echo "rtcd-rocky may already exist"
-	@orb create -a amd64 rocky:9 minio-rocky || echo "minio-rocky may already exist"
-	@echo "✓ Rocky Linux 9 VMs created"
+	@echo "✓ Core Rocky VMs created"
 	@echo ""
-	@echo "Update inventory/local.ini with:"
+	@echo "Update inventory/local.ini:"
 	@echo "  [database]"
 	@echo "  $(USER)@postgresql-rocky@orb"
 	@echo "  [app]"
 	@echo "  $(USER)@mattermost-rocky@orb"
-	@echo "  [rtcd]"
-	@echo "  $(USER)@rtcd-rocky@orb"
-	@echo "  [minio]"
-	@echo "  $(USER)@minio-rocky@orb"
+	@echo ""
+	@echo "Optional: make orb-create-vm-rtcd-rocky orb-create-vm-minio-rocky orb-create-vm-keycloak-rocky"
 
-orb-create-vms-ubuntu: ## Create Ubuntu AMD64 VMs (mattermost-ubuntu, postgresql-ubuntu, rtcd-ubuntu, minio-ubuntu)
-	@echo "Creating Ubuntu AMD64 VMs in OrbStack..."
+orb-create-vms-ubuntu: ## Create core Ubuntu AMD64 VMs (postgresql, mattermost only)
+	@echo "Creating core Ubuntu AMD64 VMs..."
 	@orb create -a amd64 ubuntu postgresql-ubuntu || echo "postgresql-ubuntu may already exist"
 	@orb create -a amd64 ubuntu mattermost-ubuntu || echo "mattermost-ubuntu may already exist"
-	@orb create -a amd64 ubuntu rtcd-ubuntu || echo "rtcd-ubuntu may already exist"
-	@orb create -a amd64 ubuntu minio-ubuntu || echo "minio-ubuntu may already exist"
-	@echo "✓ Ubuntu VMs created"
+	@echo "✓ Core Ubuntu VMs created"
 	@echo ""
-	@echo "Update inventory/local.ini with:"
+	@echo "Update inventory/local.ini:"
 	@echo "  [database]"
 	@echo "  $(USER)@postgresql-ubuntu@orb"
 	@echo "  [app]"
 	@echo "  $(USER)@mattermost-ubuntu@orb"
-	@echo "  [rtcd]"
-	@echo "  $(USER)@rtcd-ubuntu@orb"
-	@echo "  [minio]"
-	@echo "  $(USER)@minio-ubuntu@orb"
+	@echo ""
+	@echo "Optional: make orb-create-vm-rtcd-ubuntu orb-create-vm-minio-ubuntu orb-create-vm-keycloak-ubuntu"
 
-orb-delete-vms: orb-delete-vms-rocky ## Delete OrbStack VMs (default: Rocky)
+orb-delete-vm-keycloak-rocky: ## Delete Keycloak VM (Rocky)
+	@orb delete -f keycloak-rocky 2>/dev/null || true
+	@echo "✓ Keycloak VM deleted"
 
-orb-delete-vms-rocky: ## Delete Rocky Linux VMs
-	@echo "Deleting Rocky Linux VMs..."
-	@orb delete -f postgresql-rocky mattermost-rocky rtcd-rocky minio-rocky 2>/dev/null || true
-	@echo "✓ Rocky Linux VMs deleted"
+orb-delete-vm-keycloak-ubuntu: ## Delete Keycloak VM (Ubuntu)
+	@orb delete -f keycloak-ubuntu 2>/dev/null || true
+	@echo "✓ Keycloak VM deleted"
 
-orb-delete-vms-ubuntu: ## Delete Ubuntu VMs
-	@echo "Deleting Ubuntu VMs..."
-	@orb delete -f postgresql-ubuntu mattermost-ubuntu rtcd-ubuntu minio-ubuntu 2>/dev/null || true
-	@echo "✓ Ubuntu VMs deleted"
+orb-delete-vm-minio-rocky: ## Delete MinIO VM (Rocky)
+	@orb delete -f minio-rocky 2>/dev/null || true
+	@echo "✓ MinIO VM deleted"
+
+orb-delete-vm-minio-ubuntu: ## Delete MinIO VM (Ubuntu)
+	@orb delete -f minio-ubuntu 2>/dev/null || true
+	@echo "✓ MinIO VM deleted"
+
+orb-delete-vm-rtcd-rocky: ## Delete RTCD VM (Rocky)
+	@orb delete -f rtcd-rocky 2>/dev/null || true
+	@echo "✓ RTCD VM deleted"
+
+orb-delete-vm-rtcd-ubuntu: ## Delete RTCD VM (Ubuntu)
+	@orb delete -f rtcd-ubuntu 2>/dev/null || true
+	@echo "✓ RTCD VM deleted"
+
+orb-delete-vms: orb-delete-vms-rocky ## Delete core OrbStack VMs (default: Rocky)
+
+orb-delete-vms-all-rocky: orb-delete-vms-rocky orb-delete-vm-rtcd-rocky orb-delete-vm-minio-rocky orb-delete-vm-keycloak-rocky ## Delete all Rocky VMs including optional services
+
+orb-delete-vms-all-ubuntu: orb-delete-vms-ubuntu orb-delete-vm-rtcd-ubuntu orb-delete-vm-minio-ubuntu orb-delete-vm-keycloak-ubuntu ## Delete all Ubuntu VMs including optional services
+
+orb-delete-vms-rocky: ## Delete core Rocky Linux VMs
+	@echo "Deleting core Rocky Linux VMs..."
+	@orb delete -f postgresql-rocky mattermost-rocky 2>/dev/null || true
+	@echo "✓ Core Rocky VMs deleted"
+
+orb-delete-vms-ubuntu: ## Delete core Ubuntu VMs
+	@echo "Deleting core Ubuntu VMs..."
+	@orb delete -f postgresql-ubuntu mattermost-ubuntu 2>/dev/null || true
+	@echo "✓ Core Ubuntu VMs deleted"
 
 ping-local: ## Test connectivity to local VMs
 	@$(VENV_ACTIVATE) && ansible all -i inventory/local.ini -m ping
@@ -276,13 +330,15 @@ vault-create-secure: ## Create vault file with auto-generated secure passwords
 	LOCAL_PASS=$$(python3 scripts/generate_secret.py 32) && \
 	STAGING_PASS=$$(python3 scripts/generate_secret.py 32) && \
 	PROD_PASS=$$(python3 scripts/generate_secret.py 32) && \
+	KEYCLOAK_ADMIN_PASS=$$(python3 scripts/generate_secret.py 32) && \
+	KEYCLOAK_DB_PASS=$$(python3 scripts/generate_secret.py 32) && \
 	printf '%s\n' \
 		'---' \
 		'# Ansible Vault encrypted secrets' \
 		'# Generated on '"`date`" \
 		'# All variables prefixed with vault_ are referenced from group_vars files' \
 		'' \
-		'# Local environment database password (used by mattermost.yml)' \
+		'# Local environment database password (used by local.yml)' \
 		"vault_local_db_password: \"$$LOCAL_PASS\"" \
 		'' \
 		'# Staging environment database password (used by staging.yml)' \
@@ -290,6 +346,12 @@ vault-create-secure: ## Create vault file with auto-generated secure passwords
 		'' \
 		'# Production environment database password (used by production.yml)' \
 		"vault_production_db_password: \"$$PROD_PASS\"" \
+		'' \
+		'# Keycloak admin password (used for all environments)' \
+		"vault_keycloak_admin_password: \"$$KEYCLOAK_ADMIN_PASS\"" \
+		'' \
+		'# Keycloak database password (used for all environments)' \
+		"vault_keycloak_db_password: \"$$KEYCLOAK_DB_PASS\"" \
 		> group_vars/all.yml
 	@echo "✓ Vault file created at group_vars/all.yml with secure passwords"
 	@echo "Review the file with 'cat group_vars/all.yml', then run 'make vault-encrypt'"

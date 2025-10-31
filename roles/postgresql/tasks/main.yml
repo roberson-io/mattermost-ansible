@@ -257,13 +257,24 @@
   notify: Restart postgresql
   when: postgresql_allow_remote
 
-- name: Configure PostgreSQL to allow remote connections
+- name: Configure PostgreSQL to allow remote connections for Mattermost
   ansible.builtin.lineinfile:
     path: "{{ postgresql_hba_path }}"
     line: "host    {{ postgresql_db_name }}    {{ postgresql_db_user }}    0.0.0.0/0    scram-sha-256"
     state: present
   notify: Restart postgresql
   when: postgresql_allow_remote
+
+- name: Configure PostgreSQL to allow remote connections for Keycloak
+  ansible.builtin.lineinfile:
+    path: "{{ postgresql_hba_path }}"
+    line: "host    {{ keycloak_db_name | default('keycloak') }}    {{ keycloak_db_user | default('keycloak') }}    0.0.0.0/0    scram-sha-256"
+    state: present
+  notify: Restart postgresql
+  when:
+    - postgresql_allow_remote
+    - keycloak_db_name is defined
+    - keycloak_db_user is defined
 
 - name: Flush handlers to ensure PostgreSQL is restarted
   ansible.builtin.meta: flush_handlers
@@ -312,3 +323,59 @@
     objs: public
     privs: ALL
     state: present
+
+# Keycloak database setup
+- name: Create Keycloak database
+  become: true
+  become_user: postgres
+  community.postgresql.postgresql_db:
+    name: "{{ keycloak_db_name }}"
+    state: present
+  when:
+    - keycloak_db_name is defined
+    - keycloak_db_user is defined
+    - keycloak_db_password is defined
+
+- name: Create Keycloak database user
+  become: true
+  become_user: postgres
+  community.postgresql.postgresql_user:
+    name: "{{ keycloak_db_user }}"
+    password: "{{ keycloak_db_password }}"
+    encrypted: true
+    state: present
+  environment:
+    PGOPTIONS: "-c password_encryption=scram-sha-256"
+  when:
+    - keycloak_db_name is defined
+    - keycloak_db_user is defined
+    - keycloak_db_password is defined
+
+- name: Grant database privileges to Keycloak user
+  become: true
+  become_user: postgres
+  community.postgresql.postgresql_privs:
+    database: "{{ keycloak_db_name }}"
+    role: "{{ keycloak_db_user }}"
+    type: database
+    privs: ALL
+    state: present
+  when:
+    - keycloak_db_name is defined
+    - keycloak_db_user is defined
+    - keycloak_db_password is defined
+
+- name: Grant schema privileges to Keycloak user
+  become: true
+  become_user: postgres
+  community.postgresql.postgresql_privs:
+    database: "{{ keycloak_db_name }}"
+    role: "{{ keycloak_db_user }}"
+    type: schema
+    objs: public
+    privs: ALL
+    state: present
+  when:
+    - keycloak_db_name is defined
+    - keycloak_db_user is defined
+    - keycloak_db_password is defined

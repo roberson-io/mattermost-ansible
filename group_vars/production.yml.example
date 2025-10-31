@@ -31,3 +31,14 @@ nginx_force_https: true
 certbot_email: admin@example.com
 certbot_domain: "{{ nginx_server_name }}"
 certbot_create_if_missing: true
+
+# Keycloak Identity Provider configuration (optional)
+# Enable Keycloak by setting enable_keycloak to true and configuring a keycloak host in inventory
+# enable_keycloak: true
+# keycloak_version: "26.4.2"  # Optional: specify version
+# keycloak_hostname: "keycloak.example.com"
+# keycloak_admin_user: admin
+# keycloak_admin_password: "{{ vault_keycloak_admin_password }}"
+# keycloak_db_name: keycloak
+# keycloak_db_user: keycloak
+# keycloak_db_password: "{{ vault_keycloak_db_password }}"

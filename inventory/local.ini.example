@@ -34,11 +34,17 @@ YOUR_USER@YOUR_APP_HOST
 # Example: your_user@minio@orb
 # YOUR_USER@YOUR_MINIO_HOST
 
+[keycloak]
+# Optional: Enable Keycloak identity provider by uncommenting and configuring
+# Example: your_user@keycloak@orb
+# YOUR_USER@YOUR_KEYCLOAK_HOST
+
 [local:children]
 database
 app
 rtcd
 minio
+keycloak
 
 [local:vars]
 ansible_python_interpreter=/usr/bin/python3

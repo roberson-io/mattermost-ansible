@@ -120,11 +120,51 @@
     - role: rtcd
       when: enable_calls | default(false)
 
+- name: Deploy Keycloak Service
+  hosts: keycloak
+  become: true
+  gather_facts: true
+  pre_tasks:
+    - name: Install Python SELinux support (RedHat/Rocky)
+      ansible.builtin.raw: dnf install -y python3-libselinux
+      when: ansible_os_family == "RedHat"
+      changed_when: false
+
+    - name: Gather facts from database host for Keycloak
+      ansible.builtin.setup:
+      delegate_to: "{{ groups['database'][0] }}"
+      delegate_facts: true
+      when: groups.get('database', []) | length > 0
+
+    - name: Set Keycloak database host from facts
+      ansible.builtin.set_fact:
+        keycloak_db_host: "{{ hostvars[groups['database'][0]]['ansible_default_ipv4']['address'] }}"
+      when: groups.get('database', []) | length > 0
+  roles:
+    - role: keycloak
+      when: enable_keycloak | default(false)
+
 - name: Display deployment information
   hosts: app
   become: false
   gather_facts: false
   tasks:
+    - name: Gather facts from keycloak host
+      ansible.builtin.setup:
+      delegate_to: "{{ item }}"
+      delegate_facts: true
+      loop: "{{ groups.get('keycloak', []) }}"
+      when:
+        - enable_keycloak | default(false)
+        - groups.get('keycloak', []) | length > 0
+
+    - name: Set Keycloak host from facts
+      ansible.builtin.set_fact:
+        keycloak_host: "{{ hostvars[groups['keycloak'][0]]['ansible_default_ipv4']['address'] }}"
+      when:
+        - enable_keycloak | default(false)
+        - groups.get('keycloak', []) | length > 0
+
     - name: Show access URL
       ansible.builtin.debug:
         msg:
@@ -141,5 +181,9 @@
           - >-
             MinIO Console: {{ 'http://' + mattermost_minio_host + ':9001'
             if (enable_minio | default(false) and mattermost_minio_host is defined)
+            else 'Not configured' }}
+          - >-
+            Keycloak URL: {{ 'http://' + keycloak_host + ':8080'
+            if (enable_keycloak | default(false) and keycloak_host is defined)
             else 'Not configured' }}
           - "Create your admin account on first visit"

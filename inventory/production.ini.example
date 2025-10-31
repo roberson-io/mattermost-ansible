@@ -14,11 +14,16 @@ app.example.com ansible_user=ubuntu
 # Optional: Enable MinIO object storage by uncommenting and configuring
 # minio.example.com ansible_user=ubuntu
 
+[keycloak]
+# Optional: Enable Keycloak identity provider by uncommenting and configuring
+# keycloak.example.com ansible_user=ubuntu
+
 [production:children]
 database
 app
 rtcd
 minio
+keycloak
 
 [production:vars]
 ansible_python_interpreter=/usr/bin/python3

@@ -56,6 +56,17 @@ mattermost_boards_version: "9.1.7"
 # minio_root_user: "{{ vault_minio_access_key }}"
 # minio_root_password: "{{ vault_minio_secret_key }}"
 
+# Keycloak Identity Provider configuration (optional)
+# Enable Keycloak by setting enable_keycloak to true and configuring a keycloak host in inventory
+# enable_keycloak: true
+# keycloak_version: "26.4.2"  # Optional: specify version
+# keycloak_hostname: "localhost"
+# keycloak_admin_user: admin
+# keycloak_admin_password: "{{ vault_keycloak_admin_password }}"
+# keycloak_db_name: keycloak
+# keycloak_db_user: keycloak
+# keycloak_db_password: "{{ vault_keycloak_db_password }}"
+
 # No nginx/TLS for local development
 use_nginx: false
 use_tls: false

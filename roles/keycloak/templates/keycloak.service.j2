@@ -1,0 +1,30 @@
+[Unit]
+Description=Keycloak Identity and Access Management
+After=network.target
+
+[Service]
+Type=exec
+User={{ keycloak_user }}
+Group={{ keycloak_group }}
+
+Environment="KEYCLOAK_ADMIN={{ keycloak_admin_user }}"
+Environment="KEYCLOAK_ADMIN_PASSWORD={{ keycloak_admin_password }}"
+
+ExecStart={{ keycloak_install_path }}/bin/kc.sh start
+ExecReload=/bin/kill -HUP $MAINPID
+
+# Security settings
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+NoNewPrivileges=true
+
+# Resource limits
+LimitNOFILE=65536
+
+# Restart policy
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target

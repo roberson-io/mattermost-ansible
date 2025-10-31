@@ -1,0 +1,44 @@
+---
+# keycloak role default variables
+
+# Version and installation
+keycloak_version: "26.4.2"
+keycloak_download_url: "https://github.com/keycloak/keycloak/releases/download/{{ keycloak_version }}/keycloak-{{ keycloak_version }}.tar.gz"
+keycloak_install_path: /opt/keycloak
+keycloak_user: keycloak
+keycloak_group: keycloak
+
+# Admin user configuration
+keycloak_admin_user: admin
+keycloak_admin_password: "{{ vault_keycloak_admin_password }}"
+
+# HTTP(S) Configuration
+keycloak_http_enabled: true
+keycloak_http_port: 8080
+keycloak_http_host: "0.0.0.0"
+keycloak_https_enabled: false
+keycloak_https_port: 8443
+keycloak_https_certificate_file: ""
+keycloak_https_certificate_key_file: ""
+
+# Hostname configuration
+keycloak_hostname: "localhost"
+keycloak_hostname_strict: false
+keycloak_hostname_strict_https: false
+
+# Database configuration (PostgreSQL)
+keycloak_db_vendor: postgres
+keycloak_db_host: localhost
+keycloak_db_port: 5432
+keycloak_db_name: keycloak
+keycloak_db_user: keycloak
+keycloak_db_password: "{{ vault_keycloak_db_password }}"
+keycloak_db_schema: public
+
+# Health and metrics
+keycloak_health_enabled: true
+keycloak_metrics_enabled: true
+
+# Logging
+keycloak_log_level: info
+keycloak_log_console_output: default

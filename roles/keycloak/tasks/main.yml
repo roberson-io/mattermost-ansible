@@ -1,0 +1,194 @@
+---
+# keycloak role main tasks
+
+- name: Include OS-specific variables
+  ansible.builtin.include_vars: "{{ ansible_os_family }}.yml"
+
+- name: Update apt cache (Debian/Ubuntu)
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_os_family == "Debian"
+
+- name: Install required packages
+  ansible.builtin.package:
+    name: "{{ keycloak_required_packages }}"
+    state: present
+
+- name: Create keycloak group
+  ansible.builtin.group:
+    name: "{{ keycloak_group }}"
+    system: true
+    state: present
+
+- name: Create keycloak user
+  ansible.builtin.user:
+    name: "{{ keycloak_user }}"
+    group: "{{ keycloak_group }}"
+    system: true
+    create_home: false
+    shell: /usr/sbin/nologin
+    state: present
+
+- name: Check if Keycloak is already installed
+  ansible.builtin.stat:
+    path: "{{ keycloak_install_path }}/bin/kc.sh"
+  register: keycloak_binary
+
+- name: Get installed Keycloak version
+  ansible.builtin.shell: |
+    {{ keycloak_install_path }}/bin/kc.sh --version | grep -oP 'Keycloak \K[0-9.]+'
+  register: keycloak_current_version
+  changed_when: false
+  failed_when: false
+  when: keycloak_binary.stat.exists
+
+- name: Determine if Keycloak needs installation or upgrade
+  ansible.builtin.set_fact:
+    keycloak_needs_install: "{{ not keycloak_binary.stat.exists }}"
+    keycloak_needs_upgrade: >-
+      {{ keycloak_binary.stat.exists and
+         keycloak_current_version.stdout is defined and
+         keycloak_current_version.stdout | length > 0 and
+         keycloak_current_version.stdout != keycloak_version }}
+
+- name: Download Keycloak
+  ansible.builtin.get_url:
+    url: "{{ keycloak_download_url }}"
+    dest: "/tmp/keycloak-{{ keycloak_version }}.tar.gz"
+    mode: "0644"
+  when: keycloak_needs_install or keycloak_needs_upgrade
+
+- name: Extract Keycloak
+  ansible.builtin.unarchive:
+    src: "/tmp/keycloak-{{ keycloak_version }}.tar.gz"
+    dest: /opt
+    remote_src: true
+    owner: "{{ keycloak_user }}"
+    group: "{{ keycloak_group }}"
+    creates: "/opt/keycloak-{{ keycloak_version }}"
+  when: keycloak_needs_install or keycloak_needs_upgrade
+
+- name: Create Keycloak symlink
+  ansible.builtin.file:
+    src: "/opt/keycloak-{{ keycloak_version }}"
+    dest: "{{ keycloak_install_path }}"
+    state: link
+    owner: "{{ keycloak_user }}"
+    group: "{{ keycloak_group }}"
+  when: keycloak_needs_install or keycloak_needs_upgrade
+  notify: Restart keycloak
+
+- name: Create Keycloak data directory
+  ansible.builtin.file:
+    path: "{{ keycloak_install_path }}/data"
+    state: directory
+    owner: "{{ keycloak_user }}"
+    group: "{{ keycloak_group }}"
+    mode: "0755"
+
+- name: Deploy Keycloak configuration
+  ansible.builtin.template:
+    src: keycloak.conf.j2
+    dest: "{{ keycloak_install_path }}/conf/keycloak.conf"
+    owner: "{{ keycloak_user }}"
+    group: "{{ keycloak_group }}"
+    mode: "0640"
+  notify: Restart keycloak
+
+- name: Deploy Keycloak systemd service
+  ansible.builtin.template:
+    src: keycloak.service.j2
+    dest: /etc/systemd/system/keycloak.service
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart keycloak
+
+- name: Build Keycloak (optimized runtime)
+  ansible.builtin.command:
+    cmd: "{{ keycloak_install_path }}/bin/kc.sh build"
+  become: true
+  become_user: "{{ keycloak_user }}"
+  args:
+    creates: "{{ keycloak_install_path }}/data/build-complete.marker"
+  notify: Restart keycloak
+
+- name: Create build marker file
+  ansible.builtin.file:
+    path: "{{ keycloak_install_path }}/data/build-complete.marker"
+    state: touch
+    owner: "{{ keycloak_user }}"
+    group: "{{ keycloak_group }}"
+    mode: "0644"
+  when: keycloak_needs_install or keycloak_needs_upgrade
+
+- name: Enable keycloak service
+  ansible.builtin.systemd:
+    name: keycloak
+    enabled: true
+    daemon_reload: true
+
+- name: Start keycloak service
+  ansible.builtin.systemd:
+    name: keycloak
+    state: started
+  register: keycloak_start
+  failed_when: false
+
+# Firewall configuration
+- name: Check if ufw is available (Debian/Ubuntu)
+  ansible.builtin.command: which ufw
+  register: keycloak_ufw_check
+  changed_when: false
+  failed_when: false
+  when: ansible_os_family == "Debian"
+
+- name: Allow Keycloak HTTP port through firewall (ufw - Debian/Ubuntu)
+  community.general.ufw:
+    rule: allow
+    port: "{{ keycloak_http_port }}"
+    proto: tcp
+  when:
+    - ansible_os_family == "Debian"
+    - keycloak_ufw_check.rc == 0
+    - keycloak_http_enabled
+
+- name: Allow Keycloak HTTPS port through firewall (ufw - Debian/Ubuntu)
+  community.general.ufw:
+    rule: allow
+    port: "{{ keycloak_https_port }}"
+    proto: tcp
+  when:
+    - ansible_os_family == "Debian"
+    - keycloak_ufw_check.rc == 0
+    - keycloak_https_enabled
+
+- name: Check if firewalld is available (RedHat)
+  ansible.builtin.command: which firewall-cmd
+  register: keycloak_firewalld_check
+  changed_when: false
+  failed_when: false
+  when: ansible_os_family == "RedHat"
+
+- name: Allow Keycloak HTTP port through firewall (firewalld - RedHat)
+  ansible.posix.firewalld:
+    port: "{{ keycloak_http_port }}/tcp"
+    permanent: true
+    state: enabled
+    immediate: true
+  when:
+    - ansible_os_family == "RedHat"
+    - keycloak_firewalld_check.rc == 0
+    - keycloak_http_enabled
+
+- name: Allow Keycloak HTTPS port through firewall (firewalld - RedHat)
+  ansible.posix.firewalld:
+    port: "{{ keycloak_https_port }}/tcp"
+    permanent: true
+    state: enabled
+    immediate: true
+  when:
+    - ansible_os_family == "RedHat"
+    - keycloak_firewalld_check.rc == 0
+    - keycloak_https_enabled

@@ -1,0 +1,67 @@
+---
+- name: Verify
+  hosts: keycloak
+  gather_facts: false
+  tasks:
+    - name: Check Keycloak installation directory exists
+      ansible.builtin.stat:
+        path: /opt/keycloak
+      register: keycloak_dir
+      failed_when: not keycloak_dir.stat.exists
+
+    - name: Check Keycloak binary exists
+      ansible.builtin.stat:
+        path: /opt/keycloak/bin/kc.sh
+      register: keycloak_bin
+      failed_when: not keycloak_bin.stat.exists
+
+    - name: Check Keycloak binary is executable
+      ansible.builtin.stat:
+        path: /opt/keycloak/bin/kc.sh
+      register: keycloak_bin_exec
+      failed_when: not keycloak_bin_exec.stat.executable
+
+    - name: Check keycloak user exists
+      ansible.builtin.getent:
+        database: passwd
+        key: keycloak
+      register: keycloak_user
+      failed_when: keycloak_user.failed
+
+    - name: Check keycloak service exists
+      ansible.builtin.stat:
+        path: /etc/systemd/system/keycloak.service
+      register: keycloak_service
+      failed_when: not keycloak_service.stat.exists
+
+    - name: Check keycloak service is enabled
+      ansible.builtin.systemd:
+        name: keycloak
+        enabled: true
+      check_mode: true
+      register: svc_enabled
+      failed_when: svc_enabled is changed
+
+    - name: Check keycloak configuration exists
+      ansible.builtin.stat:
+        path: /opt/keycloak/conf/keycloak.conf
+      register: keycloak_config
+      failed_when: not keycloak_config.stat.exists
+
+    - name: Verify keycloak configuration contains database settings
+      ansible.builtin.command: grep -E "^db=|^db-url-host=" /opt/keycloak/conf/keycloak.conf
+      changed_when: false
+      register: config_check
+      failed_when: config_check.rc != 0
+
+    - name: Verify keycloak data directory exists
+      ansible.builtin.stat:
+        path: /opt/keycloak/data
+      register: keycloak_data
+      failed_when: not keycloak_data.stat.exists
+
+    - name: Verify keycloak data directory ownership
+      ansible.builtin.stat:
+        path: /opt/keycloak/data
+      register: keycloak_dir_check
+      failed_when: keycloak_dir_check.stat.pw_name != 'keycloak'

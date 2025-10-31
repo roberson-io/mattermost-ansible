@@ -3,7 +3,7 @@
 # Copy this file to all.yml and encrypt it with: ansible-vault encrypt group_vars/all.yml
 # All variables prefixed with vault_ will be referenced from group_vars files
 
-# Local environment database password (used by mattermost.yml)
+# Local environment database password (used by local.yml)
 vault_local_db_password: "change_me_secure_password"
 
 # Staging environment database password (used by staging.yml)
@@ -11,3 +11,9 @@ vault_staging_db_password: "change_me_secure_password"
 
 # Production environment database password (used by production.yml)
 vault_production_db_password: "change_me_secure_password"
+
+# Keycloak admin password (used for all environments)
+vault_keycloak_admin_password: "change_me_secure_password"
+
+# Keycloak database password (used for all environments)
+vault_keycloak_db_password: "change_me_secure_password"
