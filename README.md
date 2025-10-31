@@ -82,6 +82,18 @@ Role-based Ansible playbooks to deploy Mattermost for local development, staging
 
    See [Security with Ansible Vault](#security-with-ansible-vault) for more details.
 
+5. **Create your group_vars YAML file:**
+   ```bash
+   # For local development
+   cp group_vars/local.yml.example group_vars/local.yml
+
+   # For staging
+   cp group_vars/staging.yml.example group_vars/staging.yml
+   
+   # For production
+   cp group_vars/production.yml.example group_vars/production.yml
+   ```
+
 ## Project Structure
 
 ```
@@ -272,7 +284,7 @@ Manages Let's Encrypt certificates with:
 
 ## Customization
 
-Edit variables in `group_vars/mattermost.yml` (for local) or `group_vars/production.yml`:
+Edit variables in `group_vars/local.yml`, `group_vars/staging.yml`, or `group_vars/production.yml`:
 - `mattermost_version`: Version to install
 - `mattermost_db_password`: Database password
 - `nginx_server_name`: Your domain name (production only)
