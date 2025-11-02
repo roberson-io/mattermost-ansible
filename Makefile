@@ -112,6 +112,16 @@ orb-create-vm-ldap%-ubuntu: ## Create OpenLDAP VM (Ubuntu) - Usage: make orb-cre
 	@orb create -a amd64 ubuntu ldap$*-ubuntu || echo "ldap$*-ubuntu may already exist"
 	@echo "✓ OpenLDAP $* VM created. Add to inventory: [ldap$*] $(USER)@ldap$*-ubuntu@orb"
 
+orb-create-vm-redis-rocky: ## Create Redis VM (Rocky Linux 9)
+	@echo "Creating Redis VM (Rocky Linux 9)..."
+	@orb create -a amd64 rocky:9 redis-rocky || echo "redis-rocky may already exist"
+	@echo "✓ Redis VM created. Add to inventory: [redis] $(USER)@redis-rocky@orb"
+
+orb-create-vm-redis-ubuntu: ## Create Redis VM (Ubuntu)
+	@echo "Creating Redis VM (Ubuntu)..."
+	@orb create -a amd64 ubuntu redis-ubuntu || echo "redis-ubuntu may already exist"
+	@echo "✓ Redis VM created. Add to inventory: [redis] $(USER)@redis-ubuntu@orb"
+
 orb-create-vm-minio-rocky: ## Create MinIO VM (Rocky Linux 9)
 	@echo "Creating MinIO VM (Rocky Linux 9)..."
 	@orb create -a amd64 rocky:9 minio-rocky || echo "minio-rocky may already exist"
@@ -134,9 +144,9 @@ orb-create-vm-rtcd-ubuntu: ## Create RTCD VM (Ubuntu)
 
 orb-create-vms: orb-create-vms-rocky ## Create core OrbStack VMs (default: Rocky)
 
-orb-create-vms-all-rocky: orb-create-vms-rocky orb-create-vm-rtcd-rocky orb-create-vm-minio-rocky orb-create-vm-keycloak-rocky ## Create all Rocky VMs including optional services
+orb-create-vms-all-rocky: orb-create-vms-rocky orb-create-vm-rtcd-rocky orb-create-vm-minio-rocky orb-create-vm-redis-rocky orb-create-vm-keycloak-rocky ## Create all Rocky VMs including optional services
 
-orb-create-vms-all-ubuntu: orb-create-vms-ubuntu orb-create-vm-rtcd-ubuntu orb-create-vm-minio-ubuntu orb-create-vm-keycloak-ubuntu ## Create all Ubuntu VMs including optional services
+orb-create-vms-all-ubuntu: orb-create-vms-ubuntu orb-create-vm-rtcd-ubuntu orb-create-vm-minio-ubuntu orb-create-vm-redis-ubuntu orb-create-vm-keycloak-ubuntu ## Create all Ubuntu VMs including optional services
 
 orb-create-vms-rocky: ## Create core Rocky Linux 9 AMD64 VMs (postgresql, mattermost only)
 	@echo "Creating core Rocky Linux 9 AMD64 VMs..."
@@ -151,7 +161,7 @@ orb-create-vms-rocky: ## Create core Rocky Linux 9 AMD64 VMs (postgresql, matter
 	@echo "  $(USER)@mattermost-rocky@orb"
 	@echo ""
 	@echo "Optional services:"
-	@echo "  make orb-create-vm-rtcd-rocky orb-create-vm-minio-rocky orb-create-vm-keycloak-rocky"
+	@echo "  make orb-create-vm-rtcd-rocky orb-create-vm-minio-rocky orb-create-vm-redis-rocky orb-create-vm-keycloak-rocky"
 	@echo "  make orb-create-vm-ldap1-rocky orb-create-vm-ldap2-rocky ..."
 
 orb-create-vms-ubuntu: ## Create core Ubuntu AMD64 VMs (postgresql, mattermost only)
@@ -167,7 +177,7 @@ orb-create-vms-ubuntu: ## Create core Ubuntu AMD64 VMs (postgresql, mattermost o
 	@echo "  $(USER)@mattermost-ubuntu@orb"
 	@echo ""
 	@echo "Optional services:"
-	@echo "  make orb-create-vm-rtcd-ubuntu orb-create-vm-minio-ubuntu orb-create-vm-keycloak-ubuntu"
+	@echo "  make orb-create-vm-rtcd-ubuntu orb-create-vm-minio-ubuntu orb-create-vm-redis-ubuntu orb-create-vm-keycloak-ubuntu"
 	@echo "  make orb-create-vm-ldap1-ubuntu orb-create-vm-ldap2-ubuntu ..."
 
 orb-delete-vm-keycloak-rocky: ## Delete Keycloak VM (Rocky)
@@ -185,6 +195,14 @@ orb-delete-vm-ldap%-rocky: ## Delete OpenLDAP VM (Rocky) - Usage: make orb-delet
 orb-delete-vm-ldap%-ubuntu: ## Delete OpenLDAP VM (Ubuntu) - Usage: make orb-delete-vm-ldap1-ubuntu
 	@orb delete -f ldap$*-ubuntu 2>/dev/null || true
 	@echo "✓ OpenLDAP $* VM deleted"
+
+orb-delete-vm-redis-rocky: ## Delete Redis VM (Rocky)
+	@orb delete -f redis-rocky 2>/dev/null || true
+	@echo "✓ Redis VM deleted"
+
+orb-delete-vm-redis-ubuntu: ## Delete Redis VM (Ubuntu)
+	@orb delete -f redis-ubuntu 2>/dev/null || true
+	@echo "✓ Redis VM deleted"
 
 orb-delete-vm-minio-rocky: ## Delete MinIO VM (Rocky)
 	@orb delete -f minio-rocky 2>/dev/null || true
@@ -204,9 +222,9 @@ orb-delete-vm-rtcd-ubuntu: ## Delete RTCD VM (Ubuntu)
 
 orb-delete-vms: orb-delete-vms-rocky ## Delete core OrbStack VMs (default: Rocky)
 
-orb-delete-vms-all-rocky: orb-delete-vms-rocky orb-delete-vm-rtcd-rocky orb-delete-vm-minio-rocky orb-delete-vm-keycloak-rocky ## Delete all Rocky VMs including optional services
+orb-delete-vms-all-rocky: orb-delete-vms-rocky orb-delete-vm-rtcd-rocky orb-delete-vm-minio-rocky orb-delete-vm-redis-rocky orb-delete-vm-keycloak-rocky ## Delete all Rocky VMs including optional services
 
-orb-delete-vms-all-ubuntu: orb-delete-vms-ubuntu orb-delete-vm-rtcd-ubuntu orb-delete-vm-minio-ubuntu orb-delete-vm-keycloak-ubuntu ## Delete all Ubuntu VMs including optional services
+orb-delete-vms-all-ubuntu: orb-delete-vms-ubuntu orb-delete-vm-rtcd-ubuntu orb-delete-vm-minio-ubuntu orb-delete-vm-redis-ubuntu orb-delete-vm-keycloak-ubuntu ## Delete all Ubuntu VMs including optional services
 
 orb-delete-vms-rocky: ## Delete core Rocky Linux VMs
 	@echo "Deleting core Rocky Linux VMs..."

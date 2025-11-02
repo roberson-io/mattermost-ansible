@@ -8,19 +8,25 @@ This document tracks the implementation of enterprise-scale features for the Mat
 ## Phase 1: Foundation Services (Redis & Elasticsearch)
 
 ### Redis Cache Support
-- [ ] Create `roles/redis/` directory structure
-- [ ] Implement Redis installation (7.x from package repos)
-- [ ] Create Redis configuration template
-- [ ] Add systemd service management
-- [ ] Configure firewall rules (port 6379)
-- [ ] Add Redis variables to `roles/mattermost/defaults/main.yml`
-- [ ] Implement Mattermost Redis configuration via mmctl
-- [ ] Add `[redis]` host group to inventory examples
-- [ ] Update Makefile with Redis VM targets
+- [x] Review [Deployment guide for Redis in Mattermost](https://docs.mattermost.com/administration-guide/scale/redis.html)
+- [x] Review changes needed in Makefile to add separate Redis VM
+- [x] Create `roles/redis/` directory structure
+- [x] Implement Redis installation (7.4.2 compiled from source, not package repos)
+- [x] Create Redis configuration template
+- [x] Add systemd service management
+- [x] Configure firewall rules (port 6379) - conditional based on firewalld availability
+- [x] Add Redis variables to `roles/mattermost/defaults/main.yml`
+- [x] Implement Mattermost Redis configuration via mmctl
+- [x] Add `[redis]` host group to inventory examples
+- [x] Update Makefile with Redis VM targets
+- [x] Add Redis password authentication using vault pattern
+- [x] Update all environment example files with Redis configuration
 - [ ] Create Molecule tests for redis role
 - [ ] Write `docs/redis-setup.md` documentation
 
 ### Elasticsearch/OpenSearch Support
+- [ ] Review [Mattermost documentation for Elasticsearch server setup](https://docs.mattermost.com/administration-guide/scale/elasticsearch-setup.html)
+- [ ] Review changes needed in Makefile to add Elasticsearch VM
 - [ ] Create `roles/elasticsearch/` directory structure
 - [ ] Implement Elasticsearch/OpenSearch installation
 - [ ] Install and configure icu-analyzer plugin

@@ -101,6 +101,17 @@ def main():
                     ]
                 )
 
+    # Redis credentials section
+    lines.extend(section_header("REDIS CREDENTIALS (Cache)"))
+    for env in ENVIRONMENTS:
+        lines.extend(
+            [
+                f"# {env.capitalize()} environment Redis password",
+                f'vault_{env}_redis_password: "{generate_secret(SECRET_LENGTH)}"',
+                "",
+            ]
+        )
+
     # Write to stdout (will be redirected to file by Makefile)
     print("\n".join(lines))
 

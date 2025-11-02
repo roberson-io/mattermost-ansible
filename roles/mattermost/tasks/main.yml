@@ -569,6 +569,82 @@
   when: mattermost_license_file | length > 0
 
 #
+# Redis cache configuration (optional)
+#
+- name: Gather facts from redis host
+  ansible.builtin.setup:
+  delegate_to: "{{ item }}"
+  delegate_facts: true
+  loop: "{{ groups.get('redis', []) }}"
+  when:
+    - mattermost_enable_redis | default(false)
+    - groups.get('redis', []) | length > 0
+
+- name: Set Redis host from facts
+  ansible.builtin.set_fact:
+    mattermost_redis_host: "{{ hostvars[groups['redis'][0]]['ansible_default_ipv4']['address'] }}:6379"
+  when:
+    - mattermost_enable_redis | default(false)
+    - groups.get('redis', []) | length > 0
+    - mattermost_redis_host == ""
+
+- name: Configure Redis address
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set CacheSettings.RedisAddress {{ mattermost_redis_host }}
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when: mattermost_enable_redis | default(false)
+
+- name: Configure Redis database number
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set CacheSettings.RedisDB 0
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when: mattermost_enable_redis | default(false)
+
+- name: Configure Redis cache type
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set CacheSettings.CacheType redis
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when: mattermost_enable_redis | default(false)
+
+- name: Configure Redis password
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set CacheSettings.RedisPassword '{{ mattermost_redis_password }}'
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when:
+    - mattermost_enable_redis | default(false)
+    - mattermost_redis_password | default('') | length > 0
+  no_log: true
+
+- name: Restart Mattermost to apply Redis configuration
+  ansible.builtin.systemd:
+    name: mattermost
+    state: restarted
+  become: true
+  when: mattermost_enable_redis | default(false)
+
+- name: Wait for Mattermost to be ready after Redis config
+  ansible.builtin.uri:
+    url: "{{ mattermost_site_url }}/api/v4/system/ping"
+    status_code: 200
+  register: mattermost_ping_redis
+  until: mattermost_ping_redis.status == 200
+  retries: 30
+  delay: 2
+  when: mattermost_enable_redis | default(false)
+
+#
 # S3/MinIO storage configuration (optional)
 #
 - name: Configure S3 storage driver

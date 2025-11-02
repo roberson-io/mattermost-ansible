@@ -1,0 +1,10 @@
+---
+# RedHat/Rocky Linux specific variables
+
+redis_build_dependencies:
+  - gcc
+  - make
+  - tcl
+  - pkgconfig
+  - systemd-devel
+  - which

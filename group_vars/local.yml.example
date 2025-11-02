@@ -67,6 +67,16 @@ mattermost_boards_version: "9.1.7"
 # keycloak_db_user: keycloak
 # keycloak_db_password: "{{ vault_local_keycloak_db_password }}"
 
+# OpenLDAP Directory Services configuration (optional)
+# Enable OpenLDAP by setting enable_ldap to true and configuring ldap hosts in inventory
+# enable_ldap: true
+
+# Redis Cache configuration (optional)
+# Enable Redis by setting enable_redis to true and configuring a redis host in inventory
+# enable_redis: true
+# mattermost_enable_redis: true
+# mattermost_redis_password: "{{ vault_local_redis_password }}"
+
 # No nginx/TLS for local development
 use_nginx: false
 use_tls: false

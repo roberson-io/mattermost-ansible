@@ -76,3 +76,16 @@ vault_production_ldap1_config_password: "change_me_secure_password"
 # Production environment - LDAP Instance 2
 vault_production_ldap2_admin_password: "change_me_secure_password"
 vault_production_ldap2_config_password: "change_me_secure_password"
+
+# =============================================================================
+# REDIS CREDENTIALS (Cache)
+# =============================================================================
+
+# Local environment Redis password
+vault_local_redis_password: "change_me_secure_password"
+
+# Staging environment Redis password
+vault_staging_redis_password: "change_me_secure_password"
+
+# Production environment Redis password
+vault_production_redis_password: "change_me_secure_password"

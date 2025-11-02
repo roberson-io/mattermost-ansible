@@ -1,0 +1,26 @@
+[Unit]
+Description=Redis In-Memory Data Store
+After=network.target
+Documentation=https://redis.io/documentation
+
+[Service]
+Type=notify
+User=redis
+Group=redis
+ExecStart={{ redis_install_path }}/bin/redis-server /etc/redis/redis.conf
+ExecStop={{ redis_install_path }}/bin/redis-cli shutdown
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=0
+LimitNOFILE=65535
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths={{ redis_dir }}
+ReadWritePaths={{ redis_logfile | dirname }}
+ReadWritePaths=/var/run/redis
+
+[Install]
+WantedBy=multi-user.target

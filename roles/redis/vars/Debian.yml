@@ -1,0 +1,9 @@
+---
+# Debian/Ubuntu specific variables
+
+redis_build_dependencies:
+  - gcc
+  - make
+  - tcl
+  - pkg-config
+  - libsystemd-dev

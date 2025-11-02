@@ -1,0 +1,170 @@
+---
+# Redis installation and configuration tasks (source compilation)
+
+- name: Include OS-specific variables
+  ansible.builtin.include_vars: "{{ ansible_os_family }}.yml"
+
+- name: Install Redis build dependencies
+  ansible.builtin.package:
+    name: "{{ redis_build_dependencies }}"
+    state: present
+
+- name: Check if Redis is already installed
+  ansible.builtin.stat:
+    path: "{{ redis_install_path }}/bin/redis-server"
+  register: redis_binary
+
+- name: Check installed Redis version
+  ansible.builtin.command: "{{ redis_install_path }}/bin/redis-server --version"
+  register: installed_version
+  changed_when: false
+  failed_when: false
+  when: redis_binary.stat.exists
+
+- name: Set installation requirement fact
+  ansible.builtin.set_fact:
+    redis_needs_install: >-
+      {{ not redis_binary.stat.exists or
+         redis_version not in installed_version.stdout | default('') }}
+
+- name: Download Redis source
+  ansible.builtin.get_url:
+    url: "{{ redis_download_url }}"
+    dest: "/tmp/redis-{{ redis_version }}.tar.gz"
+    mode: "0644"
+  when: redis_needs_install
+
+- name: Extract Redis source
+  ansible.builtin.unarchive:
+    src: "/tmp/redis-{{ redis_version }}.tar.gz"
+    dest: /tmp
+    remote_src: true
+  when: redis_needs_install
+
+- name: Build Redis
+  ansible.builtin.command:
+    cmd: make USE_SYSTEMD=yes
+    chdir: "/tmp/redis-{{ redis_version }}"
+  when: redis_needs_install
+
+- name: Install Redis binaries
+  ansible.builtin.command:
+    cmd: make PREFIX={{ redis_install_path }} install
+    chdir: "/tmp/redis-{{ redis_version }}"
+  when: redis_needs_install
+
+- name: Clean up Redis source files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/tmp/redis-{{ redis_version }}.tar.gz"
+    - "/tmp/redis-{{ redis_version }}"
+  when: redis_needs_install
+
+- name: Create redis system user
+  ansible.builtin.user:
+    name: redis
+    system: true
+    shell: /sbin/nologin
+    home: "{{ redis_dir }}"
+    create_home: false
+
+- name: Create Redis directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: redis
+    group: redis
+    mode: "0755"
+  loop:
+    - "{{ redis_dir }}"
+    - "{{ redis_logfile | dirname }}"
+    - /etc/redis
+    - /var/run/redis
+
+- name: Deploy Redis configuration
+  ansible.builtin.template:
+    src: redis.conf.j2
+    dest: /etc/redis/redis.conf
+    owner: redis
+    group: redis
+    mode: "0640"
+  notify: restart redis
+
+- name: Deploy Redis systemd service
+  ansible.builtin.template:
+    src: redis.service.j2
+    dest: /etc/systemd/system/redis.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart redis
+
+- name: Configure firewall for Redis
+  when: redis_firewall_enabled
+  block:
+    - name: Check if firewalld is available
+      ansible.builtin.systemd:
+        name: firewalld
+      register: firewalld_service
+      failed_when: false
+
+    - name: Configure firewalld for Redis
+      when: firewalld_service.status.ActiveState == "active"
+      block:
+        - name: Open Redis port in firewalld (temporary)
+          ansible.posix.firewalld:
+            port: "{{ redis_port }}/tcp"
+            permanent: false
+            state: enabled
+            immediate: true
+
+        - name: Open Redis port in firewalld (permanent)
+          ansible.posix.firewalld:
+            port: "{{ redis_port }}/tcp"
+            permanent: true
+            state: enabled
+
+        - name: Configure rich rules for allowed sources
+          ansible.posix.firewalld:
+            rich_rule: "rule family=ipv4 source address={{ item }} port port={{ redis_port }} protocol=tcp accept"
+            permanent: true
+            state: enabled
+            immediate: true
+          loop: "{{ redis_firewall_allowed_sources }}"
+          when: redis_firewall_allowed_sources | length > 0
+
+    - name: Configure ufw for Redis (Ubuntu/Debian)
+      when: ansible_os_family == "Debian"
+      block:
+        - name: Allow Redis port in ufw
+          community.general.ufw:
+            rule: allow
+            port: "{{ redis_port }}"
+            proto: tcp
+          when: redis_firewall_allowed_sources | length == 0
+
+        - name: Allow Redis port from specific sources
+          community.general.ufw:
+            rule: allow
+            port: "{{ redis_port }}"
+            proto: tcp
+            from_ip: "{{ item }}"
+          loop: "{{ redis_firewall_allowed_sources }}"
+          when: redis_firewall_allowed_sources | length > 0
+
+- name: Enable and start Redis service
+  ansible.builtin.systemd:
+    name: redis
+    state: started
+    enabled: true
+    daemon_reload: true
+
+- name: Verify Redis is responding
+  ansible.builtin.command: "{{ redis_install_path }}/bin/redis-cli ping"
+  register: redis_ping
+  changed_when: false
+  failed_when: redis_ping.stdout != "PONG"
+  retries: 3
+  delay: 2

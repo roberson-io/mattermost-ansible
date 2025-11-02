@@ -31,6 +31,11 @@ mattermost_service_environment: "production"  # Required: production, test, or d
 mattermost_enable_boards: false  # Set to true to install Mattermost Boards plugin
 mattermost_boards_version: "9.1.6"  # Version of Boards plugin to install
 
+# Redis cache configuration (optional)
+mattermost_enable_redis: false  # Set to true to enable Redis cache
+mattermost_redis_host: ""  # Redis host address (e.g., redis-host:6379)
+mattermost_redis_password: ""  # Redis password (leave empty if no auth)
+
 # S3/MinIO object storage configuration (optional)
 mattermost_enable_s3: false  # Set to true to enable S3/MinIO for file storage
 mattermost_s3_endpoint: ""  # S3 endpoint URL (e.g., minio-host:9000 for MinIO)

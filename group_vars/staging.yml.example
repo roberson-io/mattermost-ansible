@@ -37,6 +37,38 @@ certbot_email: admin@example.com
 certbot_domain: "{{ nginx_server_name }}"
 certbot_create_if_missing: true
 
+# License configuration (optional)
+# Uncomment and set path to your license file to activate Enterprise features
+# mattermost_license_file: "license.mattermost"
+# mattermost_service_environment: "production"  # Options: test, production, or dev
+
+# Mattermost Calls configuration (optional)
+# Enable Calls by setting enable_calls to true and configuring an rtcd host in inventory
+# enable_calls: true
+# rtcd_version: "v1.2.1"
+# rtcd_api_listen_address: "0.0.0.0:8045"
+# rtcd_ice_port_udp: 8443
+# rtcd_ice_port_tcp: 8443
+
+# Mattermost Boards configuration (optional)
+# Enable Boards plugin for project management features
+# mattermost_enable_boards: true
+# mattermost_boards_version: "9.1.7"
+
+# MinIO Object Storage configuration (optional)
+# Enable MinIO by setting enable_minio to true and configuring a minio host in inventory
+# enable_minio: true
+# mattermost_enable_s3: true
+# mattermost_s3_endpoint: "{{ mattermost_minio_host | default('localhost') }}:9000"
+# mattermost_s3_bucket: "mattermost"
+# mattermost_s3_region: "us-east-1"
+# mattermost_s3_access_key_id: "{{ vault_staging_minio_access_key }}"
+# mattermost_s3_secret_access_key: "{{ vault_staging_minio_secret_key }}"
+# mattermost_s3_secure: true  # Set to false if not using TLS
+# MinIO server configuration (when enable_minio is true):
+# minio_root_user: "{{ vault_staging_minio_access_key }}"
+# minio_root_password: "{{ vault_staging_minio_secret_key }}"
+
 # Keycloak Identity Provider configuration (optional)
 # Enable Keycloak by setting enable_keycloak to true and configuring a keycloak host in inventory
 # enable_keycloak: true
@@ -47,3 +79,13 @@ certbot_create_if_missing: true
 # keycloak_db_name: keycloak
 # keycloak_db_user: keycloak
 # keycloak_db_password: "{{ vault_staging_keycloak_db_password }}"
+
+# OpenLDAP Directory Services configuration (optional)
+# Enable OpenLDAP by setting enable_ldap to true and configuring ldap hosts in inventory
+# enable_ldap: true
+
+# Redis Cache configuration (optional)
+# Enable Redis by setting enable_redis to true and configuring a redis host in inventory
+# enable_redis: true
+# mattermost_enable_redis: true
+# mattermost_redis_password: "{{ vault_staging_redis_password }}"
