@@ -18,12 +18,26 @@ app-staging.example.com ansible_user=ubuntu
 # Optional: Enable Keycloak identity provider by uncommenting and configuring
 # keycloak-staging.example.com ansible_user=ubuntu
 
+# OpenLDAP instances (optional, support multiple)
+# Uncomment and add as many LDAP instances as needed (ldap1, ldap2, ldap3, etc.)
+# [ldap1]
+# ldap1-staging.example.com ansible_user=ubuntu
+
+# [ldap2]
+# ldap2-staging.example.com ansible_user=ubuntu
+
+# Parent group for all LDAP instances
+[ldap:children]
+# ldap1
+# ldap2
+
 [staging:children]
 database
 app
 rtcd
 minio
 keycloak
+ldap
 
 [staging:vars]
 ansible_python_interpreter=/usr/bin/python3

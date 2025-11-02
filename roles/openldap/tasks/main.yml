@@ -1,0 +1,243 @@
+---
+# OpenLDAP installation and configuration tasks
+
+- name: Include OS-specific variables
+  ansible.builtin.include_vars: "{{ ansible_os_family }}.yml"
+
+- name: Install build dependencies
+  ansible.builtin.package:
+    name: "{{ openldap_build_dependencies }}"
+    state: present
+
+- name: Create OpenLDAP system user
+  ansible.builtin.user:
+    name: "{{ openldap_user }}"
+    system: true
+    shell: /sbin/nologin
+    home: "{{ openldap_data_dir }}"
+    create_home: false
+
+- name: Create OpenLDAP directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ openldap_user }}"
+    group: "{{ openldap_group }}"
+    mode: '0750'
+  loop:
+    - "{{ openldap_data_dir }}"
+    - "{{ openldap_log_dir }}"
+    - "{{ openldap_run_dir }}"
+    - "{{ openldap_config_dir }}"
+
+- name: Check if OpenLDAP is already installed
+  ansible.builtin.stat:
+    path: "{{ openldap_install_path }}/libexec/slapd"
+  register: slapd_binary
+
+- name: Get installed OpenLDAP version
+  ansible.builtin.command: "{{ openldap_install_path }}/libexec/slapd -VV"
+  register: installed_version
+  changed_when: false
+  failed_when: false
+  when: slapd_binary.stat.exists
+
+- name: Set version facts
+  ansible.builtin.set_fact:
+    openldap_needs_install: "{{ not slapd_binary.stat.exists or (installed_version.stdout is defined and openldap_version not in installed_version.stdout) }}"
+
+- name: Download OpenLDAP source
+  ansible.builtin.get_url:
+    url: "{{ openldap_download_url }}"
+    dest: "/tmp/openldap-{{ openldap_version }}.tgz"
+    mode: '0644'
+  when: openldap_needs_install
+
+- name: Extract OpenLDAP source
+  ansible.builtin.unarchive:
+    src: "/tmp/openldap-{{ openldap_version }}.tgz"
+    dest: /tmp
+    remote_src: true
+  when: openldap_needs_install
+
+- name: Stop OpenLDAP service if upgrading
+  ansible.builtin.systemd:
+    name: "slapd-{{ openldap_instance_name }}"
+    state: stopped
+  when:
+    - openldap_needs_install
+    - slapd_binary.stat.exists
+  ignore_errors: true
+
+- name: Configure OpenLDAP build
+  ansible.builtin.command:
+    cmd: >
+      ./configure
+      --prefix={{ openldap_install_path }}
+      --enable-slapd
+      --enable-mdb
+      --enable-overlays
+      --with-cyrus-sasl
+      --with-tls=openssl
+    chdir: "/tmp/openldap-{{ openldap_version }}"
+  when: openldap_needs_install
+  changed_when: true
+
+- name: Build OpenLDAP with make depend
+  ansible.builtin.command:
+    cmd: make depend
+    chdir: "/tmp/openldap-{{ openldap_version }}"
+  when: openldap_needs_install
+  changed_when: true
+
+- name: Build OpenLDAP
+  ansible.builtin.command:
+    cmd: make -j{{ ansible_processor_vcpus | default(2) }}
+    chdir: "/tmp/openldap-{{ openldap_version }}"
+  when: openldap_needs_install
+  changed_when: true
+
+- name: Install OpenLDAP
+  ansible.builtin.command:
+    cmd: make install
+    chdir: "/tmp/openldap-{{ openldap_version }}"
+  when: openldap_needs_install
+  changed_when: true
+
+- name: Clean up source files
+  ansible.builtin.file:
+    path: "/tmp/openldap-{{ openldap_version }}"
+    state: absent
+  when: openldap_needs_install
+
+- name: Clean up downloaded tarball
+  ansible.builtin.file:
+    path: "/tmp/openldap-{{ openldap_version }}.tgz"
+    state: absent
+  when: openldap_needs_install
+
+- name: Set ownership of installation directory
+  ansible.builtin.file:
+    path: "{{ openldap_install_path }}"
+    owner: "{{ openldap_user }}"
+    group: "{{ openldap_group }}"
+    recurse: true
+
+- name: Generate slapd password hash
+  ansible.builtin.command: "{{ openldap_install_path }}/sbin/slappasswd -s {{ openldap_admin_password }}"
+  register: slapd_password_hash
+  changed_when: false
+  no_log: true
+
+- name: Generate config password hash
+  ansible.builtin.command: "{{ openldap_install_path }}/sbin/slappasswd -s {{ openldap_config_password }}"
+  register: config_password_hash
+  changed_when: false
+  no_log: true
+
+- name: Deploy slapd configuration file
+  ansible.builtin.template:
+    src: slapd.conf.j2
+    dest: "{{ openldap_config_dir }}/slapd-{{ openldap_instance_name }}.conf"
+    owner: "{{ openldap_user }}"
+    group: "{{ openldap_group }}"
+    mode: '0640'
+  notify: restart openldap
+
+- name: Deploy base LDIF file
+  ansible.builtin.template:
+    src: base.ldif.j2
+    dest: "/tmp/base-{{ openldap_instance_name }}.ldif"
+    owner: "{{ openldap_user }}"
+    group: "{{ openldap_group }}"
+    mode: '0600'
+
+- name: Check if database has been initialized
+  ansible.builtin.stat:
+    path: "{{ openldap_data_dir }}/data.mdb"
+  register: db_initialized
+
+- name: Copy DB_CONFIG template
+  ansible.builtin.copy:
+    src: DB_CONFIG
+    dest: "{{ openldap_data_dir }}/DB_CONFIG"
+    owner: "{{ openldap_user }}"
+    group: "{{ openldap_group }}"
+    mode: '0640'
+  when: not db_initialized.stat.exists
+
+- name: Initialize OpenLDAP database with base DN
+  ansible.builtin.command: >
+    {{ openldap_install_path }}/sbin/slapadd
+    -l /tmp/base-{{ openldap_instance_name }}.ldif
+    -f {{ openldap_config_dir }}/slapd-{{ openldap_instance_name }}.conf
+  become_user: "{{ openldap_user }}"
+  when: not db_initialized.stat.exists
+  register: slapadd_result
+  failed_when:
+    - slapadd_result.rc != 0
+    - "'already exists' not in slapadd_result.stderr"
+
+- name: Set correct permissions on database directory
+  ansible.builtin.file:
+    path: "{{ openldap_data_dir }}"
+    owner: "{{ openldap_user }}"
+    group: "{{ openldap_group }}"
+    mode: '0750'
+    recurse: true
+
+- name: Deploy systemd service file
+  ansible.builtin.template:
+    src: slapd.service.j2
+    dest: "/etc/systemd/system/slapd-{{ openldap_instance_name }}.service"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart openldap
+
+- name: Enable and start OpenLDAP service
+  ansible.builtin.systemd:
+    name: "slapd-{{ openldap_instance_name }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Configure firewall for LDAP (firewalld)
+  ansible.posix.firewalld:
+    port: "{{ openldap_port }}/tcp"
+    permanent: true
+    state: enabled
+    immediate: true
+  when:
+    - ansible_os_family == "RedHat"
+    - ansible_facts.services['firewalld.service'] is defined
+    - ansible_facts.services['firewalld.service'].state == "running"
+
+- name: Configure firewall for LDAPS (firewalld)
+  ansible.posix.firewalld:
+    port: "{{ openldap_tls_port }}/tcp"
+    permanent: true
+    state: enabled
+    immediate: true
+  when:
+    - openldap_tls_enabled | bool
+    - ansible_os_family == "RedHat"
+    - ansible_facts.services['firewalld.service'] is defined
+    - ansible_facts.services['firewalld.service'].state == "running"
+
+- name: Configure firewall for LDAP (ufw)
+  community.general.ufw:
+    rule: allow
+    port: "{{ openldap_port }}"
+    proto: tcp
+  when:
+    - ansible_os_family == "Debian"
+
+- name: Configure firewall for LDAPS (ufw)
+  community.general.ufw:
+    rule: allow
+    port: "{{ openldap_tls_port }}"
+    proto: tcp
+  when:
+    - openldap_tls_enabled | bool
+    - ansible_os_family == "Debian"

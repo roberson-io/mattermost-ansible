@@ -1,0 +1,32 @@
+[Unit]
+Description=OpenLDAP Server Daemon ({{ openldap_instance_name }})
+Documentation=man:slapd
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=forking
+PIDFile={{ openldap_run_dir }}/slapd-{{ openldap_instance_name }}.pid
+Environment="KRB5_KTNAME=/etc/openldap/ldap.keytab"
+
+ExecStartPre=/usr/bin/mkdir -p {{ openldap_run_dir }}
+ExecStartPre=/usr/bin/chown {{ openldap_user }}:{{ openldap_group }} {{ openldap_run_dir }}
+
+ExecStart={{ openldap_install_path }}/libexec/slapd -f {{ openldap_config_dir }}/slapd-{{ openldap_instance_name }}.conf \
+  -h "ldap://{{ openldap_listen_address }}:{{ openldap_port }}/ {% if openldap_tls_enabled %}ldaps://{{ openldap_listen_address }}:{{ openldap_tls_port }}/{% endif %}" \
+  -u {{ openldap_user }} -g {{ openldap_group }}
+
+ExecReload=/bin/kill -HUP $MAINPID
+
+Restart=on-failure
+RestartSec=5s
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths={{ openldap_data_dir }} {{ openldap_log_dir }} {{ openldap_run_dir }}
+
+[Install]
+WantedBy=multi-user.target

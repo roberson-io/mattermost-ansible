@@ -102,6 +102,16 @@ orb-create-vm-keycloak-ubuntu: ## Create Keycloak VM (Ubuntu)
 	@orb create -a amd64 ubuntu keycloak-ubuntu || echo "keycloak-ubuntu may already exist"
 	@echo "✓ Keycloak VM created. Add to inventory: [keycloak] $(USER)@keycloak-ubuntu@orb"
 
+orb-create-vm-ldap%-rocky: ## Create OpenLDAP VM (Rocky Linux 9) - Usage: make orb-create-vm-ldap1-rocky
+	@echo "Creating OpenLDAP $* VM (Rocky Linux 9)..."
+	@orb create -a amd64 rocky:9 ldap$*-rocky || echo "ldap$*-rocky may already exist"
+	@echo "✓ OpenLDAP $* VM created. Add to inventory: [ldap$*] $(USER)@ldap$*-rocky@orb"
+
+orb-create-vm-ldap%-ubuntu: ## Create OpenLDAP VM (Ubuntu) - Usage: make orb-create-vm-ldap1-ubuntu
+	@echo "Creating OpenLDAP $* VM (Ubuntu)..."
+	@orb create -a amd64 ubuntu ldap$*-ubuntu || echo "ldap$*-ubuntu may already exist"
+	@echo "✓ OpenLDAP $* VM created. Add to inventory: [ldap$*] $(USER)@ldap$*-ubuntu@orb"
+
 orb-create-vm-minio-rocky: ## Create MinIO VM (Rocky Linux 9)
 	@echo "Creating MinIO VM (Rocky Linux 9)..."
 	@orb create -a amd64 rocky:9 minio-rocky || echo "minio-rocky may already exist"
@@ -140,7 +150,9 @@ orb-create-vms-rocky: ## Create core Rocky Linux 9 AMD64 VMs (postgresql, matter
 	@echo "  [app]"
 	@echo "  $(USER)@mattermost-rocky@orb"
 	@echo ""
-	@echo "Optional: make orb-create-vm-rtcd-rocky orb-create-vm-minio-rocky orb-create-vm-keycloak-rocky"
+	@echo "Optional services:"
+	@echo "  make orb-create-vm-rtcd-rocky orb-create-vm-minio-rocky orb-create-vm-keycloak-rocky"
+	@echo "  make orb-create-vm-ldap1-rocky orb-create-vm-ldap2-rocky ..."
 
 orb-create-vms-ubuntu: ## Create core Ubuntu AMD64 VMs (postgresql, mattermost only)
 	@echo "Creating core Ubuntu AMD64 VMs..."
@@ -154,7 +166,9 @@ orb-create-vms-ubuntu: ## Create core Ubuntu AMD64 VMs (postgresql, mattermost o
 	@echo "  [app]"
 	@echo "  $(USER)@mattermost-ubuntu@orb"
 	@echo ""
-	@echo "Optional: make orb-create-vm-rtcd-ubuntu orb-create-vm-minio-ubuntu orb-create-vm-keycloak-ubuntu"
+	@echo "Optional services:"
+	@echo "  make orb-create-vm-rtcd-ubuntu orb-create-vm-minio-ubuntu orb-create-vm-keycloak-ubuntu"
+	@echo "  make orb-create-vm-ldap1-ubuntu orb-create-vm-ldap2-ubuntu ..."
 
 orb-delete-vm-keycloak-rocky: ## Delete Keycloak VM (Rocky)
 	@orb delete -f keycloak-rocky 2>/dev/null || true
@@ -163,6 +177,14 @@ orb-delete-vm-keycloak-rocky: ## Delete Keycloak VM (Rocky)
 orb-delete-vm-keycloak-ubuntu: ## Delete Keycloak VM (Ubuntu)
 	@orb delete -f keycloak-ubuntu 2>/dev/null || true
 	@echo "✓ Keycloak VM deleted"
+
+orb-delete-vm-ldap%-rocky: ## Delete OpenLDAP VM (Rocky) - Usage: make orb-delete-vm-ldap1-rocky
+	@orb delete -f ldap$*-rocky 2>/dev/null || true
+	@echo "✓ OpenLDAP $* VM deleted"
+
+orb-delete-vm-ldap%-ubuntu: ## Delete OpenLDAP VM (Ubuntu) - Usage: make orb-delete-vm-ldap1-ubuntu
+	@orb delete -f ldap$*-ubuntu 2>/dev/null || true
+	@echo "✓ OpenLDAP $* VM deleted"
 
 orb-delete-vm-minio-rocky: ## Delete MinIO VM (Rocky)
 	@orb delete -f minio-rocky 2>/dev/null || true
@@ -319,41 +341,14 @@ vault-create: ## Create vault file from example template
 	@echo ""
 	@echo "TIP: Use 'make vault-create-secure' to auto-generate strong passwords"
 
-vault-create-secure: ## Create vault file with auto-generated secure passwords
+vault-create-secure: ## Create vault file with auto-generated secure passwords (environment-specific)
 	@if [ -f "group_vars/all.yml" ]; then \
 		echo "ERROR: group_vars/all.yml already exists"; \
 		echo "Use 'make vault-edit' to modify it or remove it first"; \
 		exit 1; \
 	fi
-	@echo "Creating vault file with auto-generated secure passwords..."
-	@$(VENV_ACTIVATE) && \
-	LOCAL_PASS=$$(python3 scripts/generate_secret.py 32) && \
-	STAGING_PASS=$$(python3 scripts/generate_secret.py 32) && \
-	PROD_PASS=$$(python3 scripts/generate_secret.py 32) && \
-	KEYCLOAK_ADMIN_PASS=$$(python3 scripts/generate_secret.py 32) && \
-	KEYCLOAK_DB_PASS=$$(python3 scripts/generate_secret.py 32) && \
-	printf '%s\n' \
-		'---' \
-		'# Ansible Vault encrypted secrets' \
-		'# Generated on '"`date`" \
-		'# All variables prefixed with vault_ are referenced from group_vars files' \
-		'' \
-		'# Local environment database password (used by local.yml)' \
-		"vault_local_db_password: \"$$LOCAL_PASS\"" \
-		'' \
-		'# Staging environment database password (used by staging.yml)' \
-		"vault_staging_db_password: \"$$STAGING_PASS\"" \
-		'' \
-		'# Production environment database password (used by production.yml)' \
-		"vault_production_db_password: \"$$PROD_PASS\"" \
-		'' \
-		'# Keycloak admin password (used for all environments)' \
-		"vault_keycloak_admin_password: \"$$KEYCLOAK_ADMIN_PASS\"" \
-		'' \
-		'# Keycloak database password (used for all environments)' \
-		"vault_keycloak_db_password: \"$$KEYCLOAK_DB_PASS\"" \
-		> group_vars/all.yml
-	@echo "✓ Vault file created at group_vars/all.yml with secure passwords"
+	@$(VENV_ACTIVATE) && python3 scripts/generate_vault.py > group_vars/all.yml
+	@echo "✓ Vault file created at group_vars/all.yml with environment-specific secure passwords"
 	@echo "Review the file with 'cat group_vars/all.yml', then run 'make vault-encrypt'"
 
 vault-decrypt: ## Decrypt the vault file (WARNING: removes encryption)

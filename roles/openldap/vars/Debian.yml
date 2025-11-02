@@ -1,0 +1,12 @@
+---
+# Debian/Ubuntu specific variables for OpenLDAP
+
+openldap_build_dependencies:
+  - build-essential
+  - libltdl-dev
+  - libsasl2-dev
+  - libssl-dev
+  - groff-base
+
+openldap_user: openldap
+openldap_group: openldap

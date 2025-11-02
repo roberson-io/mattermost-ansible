@@ -1,0 +1,58 @@
+#
+# OpenLDAP slapd configuration for {{ openldap_instance_name }}
+# Managed by Ansible - DO NOT EDIT MANUALLY
+#
+
+# Global Configuration
+include {{ openldap_schema_dir }}/core.schema
+{% for schema in openldap_schemas %}
+include {{ openldap_schema_dir }}/{{ schema }}.schema
+{% endfor %}
+
+pidfile {{ openldap_run_dir }}/slapd-{{ openldap_instance_name }}.pid
+argsfile {{ openldap_run_dir }}/slapd-{{ openldap_instance_name }}.args
+
+# Logging
+loglevel {{ openldap_log_level }}
+logfile {{ openldap_log_dir }}/slapd-{{ openldap_instance_name }}.log
+
+# TLS Configuration
+{% if openldap_tls_enabled %}
+TLSCACertificateFile {{ openldap_tls_ca_file }}
+TLSCertificateFile {{ openldap_tls_cert_file }}
+TLSCertificateKeyFile {{ openldap_tls_key_file }}
+TLSVerifyClient never
+{% endif %}
+
+# Module paths (for dynamic backends)
+modulepath /usr/lib64/openldap
+{% if ansible_os_family == "Debian" %}
+modulepath /usr/lib/ldap
+{% endif %}
+
+# Load dynamic backend modules
+moduleload back_{{ openldap_database_type }}.la
+
+# Database Definition
+database {{ openldap_database_type }}
+suffix "{{ openldap_base_dn }}"
+rootdn "cn={{ openldap_admin_cn }},{{ openldap_base_dn }}"
+rootpw {{ slapd_password_hash.stdout }}
+
+# Database directory
+directory {{ openldap_data_dir }}
+
+# Database performance tuning
+{% if openldap_database_type == "mdb" %}
+maxsize {{ openldap_database_max_size }}
+{% endif %}
+
+# Indexes for performance
+{% for index in openldap_indexes %}
+index {{ index }}
+{% endfor %}
+
+# Access Control Lists
+{% for rule in openldap_access_rules %}
+access {{ rule }}
+{% endfor %}

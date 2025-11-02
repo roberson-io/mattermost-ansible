@@ -1,0 +1,18 @@
+# Base DN entry for {{ openldap_instance_name }}
+# Organization: {{ openldap_organization }}
+
+dn: {{ openldap_base_dn }}
+objectClass: top
+objectClass: dcObject
+objectClass: organization
+o: {{ openldap_organization }}
+dc: {{ openldap_domain.split('.')[0] }}
+
+# Organizational Units
+dn: ou=People,{{ openldap_base_dn }}
+objectClass: organizationalUnit
+ou: People
+
+dn: ou=Groups,{{ openldap_base_dn }}
+objectClass: organizationalUnit
+ou: Groups

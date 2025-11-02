@@ -1,0 +1,15 @@
+---
+# OpenLDAP handlers
+
+- name: Restart slapd
+  ansible.builtin.systemd:
+    name: "slapd-{{ openldap_instance_name }}"
+    state: restarted
+    daemon_reload: true
+  listen: "restart openldap"
+
+- name: Reload slapd
+  ansible.builtin.systemd:
+    name: "slapd-{{ openldap_instance_name }}"
+    state: reloaded
+  listen: "reload openldap"

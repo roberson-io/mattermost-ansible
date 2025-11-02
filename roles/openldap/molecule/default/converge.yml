@@ -1,0 +1,16 @@
+---
+- name: Converge
+  hosts: all
+  vars:
+    openldap_instance_name: "test"
+    openldap_base_dn: "dc=test,dc=example,dc=com"
+    openldap_organization: "Test Organization"
+    openldap_domain: "test.example.com"
+    openldap_admin_password: "test_admin_password_123"
+    openldap_config_password: "test_config_password_123"
+    openldap_port: 389
+    openldap_tls_enabled: false
+  tasks:
+    - name: Include openldap role
+      ansible.builtin.include_role:
+        name: openldap

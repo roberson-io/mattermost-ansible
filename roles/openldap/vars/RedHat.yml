@@ -1,0 +1,13 @@
+---
+# RedHat/Rocky/CentOS specific variables for OpenLDAP
+
+openldap_build_dependencies:
+  - gcc
+  - make
+  - libtool
+  - cyrus-sasl-devel
+  - openssl-devel
+  - groff
+
+openldap_user: ldap
+openldap_group: ldap

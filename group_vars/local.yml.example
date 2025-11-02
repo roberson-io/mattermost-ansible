@@ -49,12 +49,12 @@ mattermost_boards_version: "9.1.7"
 # mattermost_s3_endpoint: "{{ mattermost_minio_host | default('localhost') }}:9000"
 # mattermost_s3_bucket: "mattermost"
 # mattermost_s3_region: "us-east-1"
-# mattermost_s3_access_key_id: "{{ vault_minio_access_key }}"
-# mattermost_s3_secret_access_key: "{{ vault_minio_secret_key }}"
+# mattermost_s3_access_key_id: "{{ vault_local_minio_access_key }}"
+# mattermost_s3_secret_access_key: "{{ vault_local_minio_secret_key }}"
 # mattermost_s3_secure: false  # Set to true if using TLS
 # MinIO server configuration (when enable_minio is true):
-# minio_root_user: "{{ vault_minio_access_key }}"
-# minio_root_password: "{{ vault_minio_secret_key }}"
+# minio_root_user: "{{ vault_local_minio_access_key }}"
+# minio_root_password: "{{ vault_local_minio_secret_key }}"
 
 # Keycloak Identity Provider configuration (optional)
 # Enable Keycloak by setting enable_keycloak to true and configuring a keycloak host in inventory
@@ -62,10 +62,10 @@ mattermost_boards_version: "9.1.7"
 # keycloak_version: "26.4.2"  # Optional: specify version
 # keycloak_hostname: "localhost"
 # keycloak_admin_user: admin
-# keycloak_admin_password: "{{ vault_keycloak_admin_password }}"
+# keycloak_admin_password: "{{ vault_local_keycloak_admin_password }}"
 # keycloak_db_name: keycloak
 # keycloak_db_user: keycloak
-# keycloak_db_password: "{{ vault_keycloak_db_password }}"
+# keycloak_db_password: "{{ vault_local_keycloak_db_password }}"
 
 # No nginx/TLS for local development
 use_nginx: false

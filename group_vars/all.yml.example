@@ -3,17 +3,76 @@
 # Copy this file to all.yml and encrypt it with: ansible-vault encrypt group_vars/all.yml
 # All variables prefixed with vault_ will be referenced from group_vars files
 
-# Local environment database password (used by local.yml)
+# =============================================================================
+# DATABASE PASSWORDS (PostgreSQL)
+# =============================================================================
+
+# Local environment database password
 vault_local_db_password: "change_me_secure_password"
 
-# Staging environment database password (used by staging.yml)
+# Staging environment database password
 vault_staging_db_password: "change_me_secure_password"
 
-# Production environment database password (used by production.yml)
+# Production environment database password
 vault_production_db_password: "change_me_secure_password"
 
-# Keycloak admin password (used for all environments)
-vault_keycloak_admin_password: "change_me_secure_password"
+# =============================================================================
+# MINIO CREDENTIALS (Object Storage)
+# =============================================================================
 
-# Keycloak database password (used for all environments)
-vault_keycloak_db_password: "change_me_secure_password"
+# Local environment MinIO credentials
+vault_local_minio_access_key: "change_me_secure_password"
+vault_local_minio_secret_key: "change_me_secure_password"
+
+# Staging environment MinIO credentials
+vault_staging_minio_access_key: "change_me_secure_password"
+vault_staging_minio_secret_key: "change_me_secure_password"
+
+# Production environment MinIO credentials
+vault_production_minio_access_key: "change_me_secure_password"
+vault_production_minio_secret_key: "change_me_secure_password"
+
+# =============================================================================
+# KEYCLOAK CREDENTIALS (Identity Provider)
+# =============================================================================
+
+# Local environment Keycloak credentials
+vault_local_keycloak_admin_password: "change_me_secure_password"
+vault_local_keycloak_db_password: "change_me_secure_password"
+
+# Staging environment Keycloak credentials
+vault_staging_keycloak_admin_password: "change_me_secure_password"
+vault_staging_keycloak_db_password: "change_me_secure_password"
+
+# Production environment Keycloak credentials
+vault_production_keycloak_admin_password: "change_me_secure_password"
+vault_production_keycloak_db_password: "change_me_secure_password"
+
+# =============================================================================
+# OPENLDAP CREDENTIALS (Directory Services)
+# Add more instances as needed (ldap3, ldap4, etc.)
+# =============================================================================
+
+# Local environment - LDAP Instance 1
+vault_local_ldap1_admin_password: "change_me_secure_password"
+vault_local_ldap1_config_password: "change_me_secure_password"
+
+# Local environment - LDAP Instance 2
+vault_local_ldap2_admin_password: "change_me_secure_password"
+vault_local_ldap2_config_password: "change_me_secure_password"
+
+# Staging environment - LDAP Instance 1
+vault_staging_ldap1_admin_password: "change_me_secure_password"
+vault_staging_ldap1_config_password: "change_me_secure_password"
+
+# Staging environment - LDAP Instance 2
+vault_staging_ldap2_admin_password: "change_me_secure_password"
+vault_staging_ldap2_config_password: "change_me_secure_password"
+
+# Production environment - LDAP Instance 1
+vault_production_ldap1_admin_password: "change_me_secure_password"
+vault_production_ldap1_config_password: "change_me_secure_password"
+
+# Production environment - LDAP Instance 2
+vault_production_ldap2_admin_password: "change_me_secure_password"
+vault_production_ldap2_config_password: "change_me_secure_password"

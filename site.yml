@@ -144,6 +144,19 @@
     - role: keycloak
       when: enable_keycloak | default(false)
 
+- name: Deploy OpenLDAP Services
+  hosts: ldap
+  become: true
+  gather_facts: true
+  pre_tasks:
+    - name: Install Python SELinux support (RedHat/Rocky)
+      ansible.builtin.raw: dnf install -y python3-libselinux
+      when: ansible_os_family == "RedHat"
+      changed_when: false
+  roles:
+    - role: openldap
+      when: enable_ldap | default(false)
+
 - name: Display deployment information
   hosts: app
   become: false
@@ -165,6 +178,22 @@
         - enable_keycloak | default(false)
         - groups.get('keycloak', []) | length > 0
 
+    - name: Gather facts from ldap hosts
+      ansible.builtin.setup:
+      delegate_to: "{{ item }}"
+      delegate_facts: true
+      loop: "{{ groups.get('ldap', []) }}"
+      when:
+        - enable_ldap | default(false)
+        - groups.get('ldap', []) | length > 0
+
+    - name: Build LDAP hosts list
+      ansible.builtin.set_fact:
+        ldap_hosts: "{{ groups.get('ldap', []) | map('extract', hostvars, 'ansible_default_ipv4') | map(attribute='address') | list }}"
+      when:
+        - enable_ldap | default(false)
+        - groups.get('ldap', []) | length > 0
+
     - name: Show access URL
       ansible.builtin.debug:
         msg:
@@ -185,5 +214,9 @@
           - >-
             Keycloak URL: {{ 'http://' + keycloak_host + ':8080'
             if (enable_keycloak | default(false) and keycloak_host is defined)
+            else 'Not configured' }}
+          - >-
+            OpenLDAP URLs: {{ ldap_hosts | map('regex_replace', '^(.*)$', 'ldap://\1:389') | join(', ')
+            if (enable_ldap | default(false) and ldap_hosts is defined and ldap_hosts | length > 0)
             else 'Not configured' }}
           - "Create your admin account on first visit"

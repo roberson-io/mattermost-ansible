@@ -1,0 +1,13 @@
+# Berkeley DB configuration for OpenLDAP
+# Note: This is used for older bdb/hdb backends
+# For mdb backend, this file is optional but kept for compatibility
+
+# Set the database in memory cache size
+set_cachesize 0 268435456 1
+
+# Set database flags
+set_flags DB_LOG_AUTOREMOVE
+
+# Set log values
+set_lg_regionmax 262144
+set_lg_bsize 2097152
