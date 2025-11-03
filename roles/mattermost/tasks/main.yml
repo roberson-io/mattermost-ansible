@@ -571,6 +571,54 @@
 #
 # Redis cache configuration (optional)
 #
+
+# Disable Redis if mattermost_enable_redis is false
+- name: Revert to LRU cache when Redis is disabled
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set CacheSettings.CacheType lru
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when: not (mattermost_enable_redis | default(false))
+
+- name: Clear Redis address when Redis is disabled
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set CacheSettings.RedisAddress ""
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when: not (mattermost_enable_redis | default(false))
+
+- name: Clear Redis password when Redis is disabled
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set CacheSettings.RedisPassword ""
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when: not (mattermost_enable_redis | default(false))
+  no_log: true
+
+- name: Restart Mattermost to apply cache type change
+  ansible.builtin.systemd:
+    name: mattermost
+    state: restarted
+  become: true
+  when: not (mattermost_enable_redis | default(false))
+
+- name: Wait for Mattermost to be ready after disabling Redis
+  ansible.builtin.uri:
+    url: "{{ mattermost_site_url }}/api/v4/system/ping"
+    status_code: 200
+  register: mattermost_ping_no_redis
+  until: mattermost_ping_no_redis.status == 200
+  retries: 30
+  delay: 2
+  when: not (mattermost_enable_redis | default(false))
+
+# Enable Redis configuration
 - name: Gather facts from redis host
   ansible.builtin.setup:
   delegate_to: "{{ item }}"
