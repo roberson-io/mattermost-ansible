@@ -1,7 +1,11 @@
 ---
 # OpenLDAP instance 2 configuration
+# This file configures ldap2 instance across all environments (local, staging, production)
 # Copy this file and customize for additional instances (ldap3.yml, ldap4.yml, etc.)
 # Remember to add corresponding vault passwords in group_vars/all.yml
+
+# Note: The deployment_environment variable is set in inventory files
+# (e.g., inventory/local.ini sets deployment_environment=local)
 
 # Enable this LDAP instance
 enable_ldap: true
@@ -22,8 +26,8 @@ openldap_base_dn: "dc=example2,dc=com"
 openldap_organization: "Example Organization 2"
 openldap_domain: "example2.com"
 openldap_admin_cn: "admin"
-openldap_admin_password: "{{ vault_local_ldap2_admin_password }}"
-openldap_config_password: "{{ vault_local_ldap2_config_password }}"
+openldap_admin_password: "{{ lookup('vars', 'vault_' + deployment_environment + '_ldap2_admin_password', default='') }}"
+openldap_config_password: "{{ lookup('vars', 'vault_' + deployment_environment + '_ldap2_config_password', default='') }}"
 
 # Schemas to load (core is always loaded automatically)
 openldap_schemas:

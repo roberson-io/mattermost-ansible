@@ -69,6 +69,11 @@ mattermost_boards_version: "9.1.7"
 
 # OpenLDAP Directory Services configuration (optional)
 # Enable OpenLDAP by setting enable_ldap to true and configuring ldap hosts in inventory
+# Note: Per-instance LDAP configuration (ldap1, ldap2, etc.) is in separate files
+# at group_vars/ldap1.yml, group_vars/ldap2.yml, etc.
+# This allows different base DNs, organizations, and TLS settings per instance.
+# The ldap*.yml files use environment-aware vault lookups to work across all environments.
+# See group_vars/ldap*.yml.example for available configuration options.
 # enable_ldap: true
 
 # Redis Cache configuration (optional)
@@ -76,6 +81,7 @@ mattermost_boards_version: "9.1.7"
 # enable_redis: true
 # mattermost_enable_redis: true
 # mattermost_redis_password: "{{ vault_local_redis_password }}"
+# redis_requirepass: "{{ vault_local_redis_password }}"
 
 # No nginx/TLS for local development
 use_nginx: false

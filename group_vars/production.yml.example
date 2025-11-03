@@ -82,6 +82,11 @@ certbot_create_if_missing: true
 
 # OpenLDAP Directory Services configuration (optional)
 # Enable OpenLDAP by setting enable_ldap to true and configuring ldap hosts in inventory
+# Note: Per-instance LDAP configuration (ldap1, ldap2, etc.) is in separate files
+# at group_vars/ldap1.yml, group_vars/ldap2.yml, etc.
+# This allows different base DNs, organizations, and TLS settings per instance.
+# The ldap*.yml files use environment-aware vault lookups to work across all environments.
+# See group_vars/ldap*.yml.example for available configuration options.
 # enable_ldap: true
 
 # Redis Cache configuration (optional)
@@ -89,3 +94,4 @@ certbot_create_if_missing: true
 # enable_redis: true
 # mattermost_enable_redis: true
 # mattermost_redis_password: "{{ vault_production_redis_password }}"
+# redis_requirepass: "{{ vault_production_redis_password }}"
