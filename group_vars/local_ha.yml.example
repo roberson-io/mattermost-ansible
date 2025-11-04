@@ -31,7 +31,7 @@ postgresql_autovacuum_max_workers: 3
 postgresql_max_worker_processes: 8
 
 # Mattermost configuration
-mattermost_version: "10.12.0"
+mattermost_version: "11.0.4"
 mattermost_db_host: "{{ hostvars[groups['database'][0]]['ansible_default_ipv4']['address'] }}"
 mattermost_db_port: 5432
 mattermost_db_name: mattermost

@@ -36,7 +36,7 @@ enable_calls: true
 # Mattermost Boards configuration (optional)
 # Enable Boards plugin for project management features
 mattermost_enable_boards: true
-mattermost_boards_version: "9.1.7"
+mattermost_boards_version: "9.2.0"
 # rtcd_version: "v1.2.1"
 # rtcd_api_listen_address: "0.0.0.0:8045"
 # rtcd_ice_port_udp: 8443

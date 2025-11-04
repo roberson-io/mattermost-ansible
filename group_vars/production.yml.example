@@ -31,7 +31,7 @@ postgresql_db_password: "{{ vault_production_db_password }}"
 #   - "postgres://{{ postgresql_db_user }}:{{ vault_production_db_password }}@search-replica.example.com:5432/{{ postgresql_db_name }}?sslmode=disable"
 
 # Mattermost configuration
-mattermost_version: "10.12.0"
+mattermost_version: "11.0.4"
 mattermost_db_host: "{{ hostvars[groups['database'][0]]['ansible_default_ipv4']['address'] }}"
 mattermost_db_port: 5432
 mattermost_db_name: mattermost
@@ -74,7 +74,7 @@ certbot_create_if_missing: true
 # Mattermost Boards configuration (optional)
 # Enable Boards plugin for project management features
 # mattermost_enable_boards: true
-# mattermost_boards_version: "9.1.7"
+# mattermost_boards_version: "9.2.0"
 
 # MinIO Object Storage configuration (optional)
 # Enable MinIO by setting enable_minio to true and configuring a minio host in inventory
