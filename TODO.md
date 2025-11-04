@@ -25,19 +25,19 @@ This document tracks the implementation of enterprise-scale features for the Mat
 - [ ] Write `docs/redis-setup.md` documentation
 
 ### Elasticsearch/OpenSearch Support
-- [ ] Review [Mattermost documentation for Elasticsearch server setup](https://docs.mattermost.com/administration-guide/scale/elasticsearch-setup.html)
-- [ ] Review changes needed in Makefile to add Elasticsearch VM
-- [ ] Create `roles/elasticsearch/` directory structure
-- [ ] Implement Elasticsearch/OpenSearch installation
-- [ ] Install and configure icu-analyzer plugin
-- [ ] Create Elasticsearch configuration template
-- [ ] Add systemd service management
-- [ ] Configure firewall rules (ports 9200, 9300)
-- [ ] Add Elasticsearch variables to `roles/mattermost/defaults/main.yml`
-- [ ] Implement Mattermost Elasticsearch configuration via mmctl
-- [ ] Add task to trigger initial index build
-- [ ] Add `[elasticsearch]` host group to inventory examples
-- [ ] Update Makefile with Elasticsearch VM targets
+- [x] Review [Mattermost documentation for Elasticsearch server setup](https://docs.mattermost.com/administration-guide/scale/elasticsearch-setup.html)
+- [x] Review changes needed in Makefile to add Elasticsearch VM
+- [x] Create `roles/elasticsearch/` directory structure
+- [x] Implement Elasticsearch/OpenSearch installation
+- [x] Install and configure icu-analyzer plugin
+- [x] Create Elasticsearch configuration template
+- [x] Add systemd service management
+- [x] Configure firewall rules (ports 9200, 9300)
+- [x] Add Elasticsearch variables to `roles/mattermost/defaults/main.yml`
+- [x] Implement Mattermost Elasticsearch configuration via mmctl
+- [x] Add task to trigger initial index build
+- [x] Add `[elasticsearch]` host group to inventory examples
+- [x] Update Makefile with Elasticsearch VM targets
 - [ ] Create Molecule tests for elasticsearch role
 - [ ] Write `docs/elasticsearch-setup.md` documentation
 

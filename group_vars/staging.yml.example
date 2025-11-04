@@ -95,3 +95,25 @@ certbot_create_if_missing: true
 # mattermost_enable_redis: true
 # mattermost_redis_password: "{{ vault_staging_redis_password }}"
 # redis_requirepass: "{{ vault_staging_redis_password }}"
+
+# Elasticsearch Search configuration (optional)
+# Enable Elasticsearch by setting enable_elasticsearch to true and configuring an elasticsearch host in inventory
+# Recommended for deployments with over 5 million posts
+# enable_elasticsearch: true
+# mattermost_enable_elasticsearch: true
+# Elasticsearch 8.x is the default (recommended for production/staging with proper kernel support)
+# elasticsearch_major_version: "8"  # Default, can use "7" if needed
+# elasticsearch_version: "8.16.1"  # Specific version
+# Elasticsearch connection is auto-configured from inventory
+# Optional: Authentication (required for ES8 with security enabled)
+# mattermost_elasticsearch_username: "elastic"
+# mattermost_elasticsearch_password: "{{ vault_staging_elasticsearch_password }}"
+# Optional: TLS/Security settings (recommended for staging)
+# mattermost_elasticsearch_skip_tls_verification: false
+# mattermost_elasticsearch_ca_path: "./elasticsearch/ca.pem"  # Custom CA certificate (PEM format)
+# mattermost_elasticsearch_client_cert_path: "./elasticsearch/client-cert.pem"  # Client cert for mTLS (PEM format)
+# mattermost_elasticsearch_client_key_path: "./elasticsearch/client-key.pem"  # Client key for mTLS (PEM format)
+# Multi-node cluster configuration (for testing enterprise scale, 2-4 nodes recommended):
+# elasticsearch_cluster_mode: "multi"  # Set to "multi" for cluster, "single" for single-node
+# elasticsearch_heap_size: "8g"  # Adjust based on staging environment
+# Seed hosts and initial master nodes are auto-configured from inventory

@@ -59,6 +59,19 @@
     - role: redis
       when: enable_redis | default(false)
 
+- name: Deploy Elasticsearch Search
+  hosts: elasticsearch
+  become: true
+  gather_facts: true
+  pre_tasks:
+    - name: Install Python SELinux support (RedHat/Rocky)
+      ansible.builtin.raw: dnf install -y python3-libselinux
+      when: ansible_os_family == "RedHat"
+      changed_when: false
+  roles:
+    - role: elasticsearch
+      when: enable_elasticsearch | default(false)
+
 - name: Deploy Mattermost Application
   hosts: app
   become: true

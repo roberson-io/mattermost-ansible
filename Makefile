@@ -132,6 +132,46 @@ orb-create-vm-redis-ubuntu: ## Create Redis VM (Ubuntu)
 	@orb create -a amd64 ubuntu redis-ubuntu || echo "redis-ubuntu may already exist"
 	@echo "✓ Redis VM created. Add to inventory: [redis] $(USER)@redis-ubuntu@orb"
 
+orb-create-vm-elasticsearch-rocky: orb-create-vm-elasticsearch1-rocky ## Create single Elasticsearch VM (Rocky Linux 9)
+
+orb-create-vm-elasticsearch-ubuntu: orb-create-vm-elasticsearch1-ubuntu ## Create single Elasticsearch VM (Ubuntu)
+
+orb-create-vm-elasticsearch1-rocky: ## Create Elasticsearch node 1 VM (Rocky Linux 9)
+	@echo "Creating Elasticsearch node 1 VM (Rocky Linux 9)..."
+	@orb create -a amd64 rocky:9 elasticsearch1-rocky || echo "elasticsearch1-rocky may already exist"
+	@echo "✓ Elasticsearch node 1 VM created. Add to inventory: [elasticsearch1] $(USER)@elasticsearch1-rocky@orb"
+
+orb-create-vm-elasticsearch1-ubuntu: ## Create Elasticsearch node 1 VM (Ubuntu)
+	@echo "Creating Elasticsearch node 1 VM (Ubuntu)..."
+	@orb create -a amd64 ubuntu elasticsearch1-ubuntu || echo "elasticsearch1-ubuntu may already exist"
+	@echo "✓ Elasticsearch node 1 VM created. Add to inventory: [elasticsearch1] $(USER)@elasticsearch1-ubuntu@orb"
+
+orb-create-vm-elasticsearch2-rocky: ## Create Elasticsearch node 2 VM (Rocky Linux 9)
+	@echo "Creating Elasticsearch node 2 VM (Rocky Linux 9)..."
+	@orb create -a amd64 rocky:9 elasticsearch2-rocky || echo "elasticsearch2-rocky may already exist"
+	@echo "✓ Elasticsearch node 2 VM created. Add to inventory: [elasticsearch2] $(USER)@elasticsearch2-rocky@orb"
+
+orb-create-vm-elasticsearch2-ubuntu: ## Create Elasticsearch node 2 VM (Ubuntu)
+	@echo "Creating Elasticsearch node 2 VM (Ubuntu)..."
+	@orb create -a amd64 ubuntu elasticsearch2-ubuntu || echo "elasticsearch2-ubuntu may already exist"
+	@echo "✓ Elasticsearch node 2 VM created. Add to inventory: [elasticsearch2] $(USER)@elasticsearch2-ubuntu@orb"
+
+orb-create-vm-elasticsearch3-rocky: ## Create Elasticsearch node 3 VM (Rocky Linux 9)
+	@echo "Creating Elasticsearch node 3 VM (Rocky Linux 9)..."
+	@orb create -a amd64 rocky:9 elasticsearch3-rocky || echo "elasticsearch3-rocky may already exist"
+	@echo "✓ Elasticsearch node 3 VM created. Add to inventory: [elasticsearch3] $(USER)@elasticsearch3-rocky@orb"
+
+orb-create-vm-elasticsearch3-ubuntu: ## Create Elasticsearch node 3 VM (Ubuntu)
+	@echo "Creating Elasticsearch node 3 VM (Ubuntu)..."
+	@orb create -a amd64 ubuntu elasticsearch3-ubuntu || echo "elasticsearch3-ubuntu may already exist"
+	@echo "✓ Elasticsearch node 3 VM created. Add to inventory: [elasticsearch3] $(USER)@elasticsearch3-ubuntu@orb"
+
+orb-create-vms-elasticsearch-cluster-rocky: orb-create-vm-elasticsearch1-rocky orb-create-vm-elasticsearch2-rocky orb-create-vm-elasticsearch3-rocky ## Create 3-node Elasticsearch cluster (Rocky Linux 9)
+	@echo "✓ Elasticsearch cluster VMs created. Configure inventory with [elasticsearch:children] pattern"
+
+orb-create-vms-elasticsearch-cluster-ubuntu: orb-create-vm-elasticsearch1-ubuntu orb-create-vm-elasticsearch2-ubuntu orb-create-vm-elasticsearch3-ubuntu ## Create 3-node Elasticsearch cluster (Ubuntu)
+	@echo "✓ Elasticsearch cluster VMs created. Configure inventory with [elasticsearch:children] pattern"
+
 orb-create-vm-rtcd-rocky: ## Create RTCD VM (Rocky Linux 9)
 	@echo "Creating RTCD VM (Rocky Linux 9)..."
 	@orb create -a amd64 rocky:9 rtcd-rocky || echo "rtcd-rocky may already exist"
@@ -144,9 +184,9 @@ orb-create-vm-rtcd-ubuntu: ## Create RTCD VM (Ubuntu)
 
 orb-create-vms: orb-create-vms-rocky ## Create core OrbStack VMs (default: Rocky)
 
-orb-create-vms-all-rocky: orb-create-vms-rocky orb-create-vm-keycloak-rocky orb-create-vm-minio-rocky orb-create-vm-redis-rocky orb-create-vm-rtcd-rocky ## Create all Rocky VMs including optional services
+orb-create-vms-all-rocky: orb-create-vms-rocky orb-create-vm-keycloak-rocky orb-create-vm-minio-rocky orb-create-vm-redis-rocky orb-create-vm-elasticsearch-rocky orb-create-vm-rtcd-rocky ## Create all Rocky VMs including optional services
 
-orb-create-vms-all-ubuntu: orb-create-vms-ubuntu orb-create-vm-keycloak-ubuntu orb-create-vm-minio-ubuntu orb-create-vm-redis-ubuntu orb-create-vm-rtcd-ubuntu ## Create all Ubuntu VMs including optional services
+orb-create-vms-all-ubuntu: orb-create-vms-ubuntu orb-create-vm-keycloak-ubuntu orb-create-vm-minio-ubuntu orb-create-vm-redis-ubuntu orb-create-vm-elasticsearch-ubuntu orb-create-vm-rtcd-ubuntu ## Create all Ubuntu VMs including optional services
 
 orb-create-vms-rocky: ## Create core Rocky Linux 9 AMD64 VMs (postgresql, mattermost only)
 	@echo "Creating core Rocky Linux 9 AMD64 VMs..."
@@ -161,7 +201,7 @@ orb-create-vms-rocky: ## Create core Rocky Linux 9 AMD64 VMs (postgresql, matter
 	@echo "  $(USER)@mattermost-rocky@orb"
 	@echo ""
 	@echo "Optional services:"
-	@echo "  make orb-create-vm-keycloak-rocky orb-create-vm-minio-rocky orb-create-vm-redis-rocky orb-create-vm-rtcd-rocky"
+	@echo "  make orb-create-vm-keycloak-rocky orb-create-vm-minio-rocky orb-create-vm-redis-rocky orb-create-vm-elasticsearch-rocky orb-create-vm-rtcd-rocky"
 	@echo "  make orb-create-vm-ldap1-rocky orb-create-vm-ldap2-rocky ..."
 
 orb-create-vms-ubuntu: ## Create core Ubuntu AMD64 VMs (postgresql, mattermost only)
@@ -177,8 +217,16 @@ orb-create-vms-ubuntu: ## Create core Ubuntu AMD64 VMs (postgresql, mattermost o
 	@echo "  $(USER)@mattermost-ubuntu@orb"
 	@echo ""
 	@echo "Optional services:"
-	@echo "  make orb-create-vm-keycloak-ubuntu orb-create-vm-minio-ubuntu orb-create-vm-redis-ubuntu orb-create-vm-rtcd-ubuntu"
+	@echo "  make orb-create-vm-keycloak-ubuntu orb-create-vm-minio-ubuntu orb-create-vm-redis-ubuntu orb-create-vm-elasticsearch-ubuntu orb-create-vm-rtcd-ubuntu"
 	@echo "  make orb-create-vm-ldap1-ubuntu orb-create-vm-ldap2-ubuntu ..."
+
+orb-delete-vm-elasticsearch-rocky: ## Delete Elasticsearch VM (Rocky)
+	@orb delete -f elasticsearch-rocky 2>/dev/null || true
+	@echo "✓ Elasticsearch VM deleted"
+
+orb-delete-vm-elasticsearch-ubuntu: ## Delete Elasticsearch VM (Ubuntu)
+	@orb delete -f elasticsearch-ubuntu 2>/dev/null || true
+	@echo "✓ Elasticsearch VM deleted"
 
 orb-delete-vm-keycloak-rocky: ## Delete Keycloak VM (Rocky)
 	@orb delete -f keycloak-rocky 2>/dev/null || true
@@ -212,6 +260,38 @@ orb-delete-vm-redis-ubuntu: ## Delete Redis VM (Ubuntu)
 	@orb delete -f redis-ubuntu 2>/dev/null || true
 	@echo "✓ Redis VM deleted"
 
+orb-delete-vm-elasticsearch-rocky: orb-delete-vm-elasticsearch1-rocky ## Delete single Elasticsearch VM (Rocky)
+
+orb-delete-vm-elasticsearch-ubuntu: orb-delete-vm-elasticsearch1-ubuntu ## Delete single Elasticsearch VM (Ubuntu)
+
+orb-delete-vm-elasticsearch1-rocky: ## Delete Elasticsearch node 1 VM (Rocky)
+	@orb delete -f elasticsearch1-rocky 2>/dev/null || true
+	@echo "✓ Elasticsearch node 1 VM deleted"
+
+orb-delete-vm-elasticsearch1-ubuntu: ## Delete Elasticsearch node 1 VM (Ubuntu)
+	@orb delete -f elasticsearch1-ubuntu 2>/dev/null || true
+	@echo "✓ Elasticsearch node 1 VM deleted"
+
+orb-delete-vm-elasticsearch2-rocky: ## Delete Elasticsearch node 2 VM (Rocky)
+	@orb delete -f elasticsearch2-rocky 2>/dev/null || true
+	@echo "✓ Elasticsearch node 2 VM deleted"
+
+orb-delete-vm-elasticsearch2-ubuntu: ## Delete Elasticsearch node 2 VM (Ubuntu)
+	@orb delete -f elasticsearch2-ubuntu 2>/dev/null || true
+	@echo "✓ Elasticsearch node 2 VM deleted"
+
+orb-delete-vm-elasticsearch3-rocky: ## Delete Elasticsearch node 3 VM (Rocky)
+	@orb delete -f elasticsearch3-rocky 2>/dev/null || true
+	@echo "✓ Elasticsearch node 3 VM deleted"
+
+orb-delete-vm-elasticsearch3-ubuntu: ## Delete Elasticsearch node 3 VM (Ubuntu)
+	@orb delete -f elasticsearch3-ubuntu 2>/dev/null || true
+	@echo "✓ Elasticsearch node 3 VM deleted"
+
+orb-delete-vms-elasticsearch-cluster-rocky: orb-delete-vm-elasticsearch1-rocky orb-delete-vm-elasticsearch2-rocky orb-delete-vm-elasticsearch3-rocky ## Delete 3-node Elasticsearch cluster (Rocky)
+
+orb-delete-vms-elasticsearch-cluster-ubuntu: orb-delete-vm-elasticsearch1-ubuntu orb-delete-vm-elasticsearch2-ubuntu orb-delete-vm-elasticsearch3-ubuntu ## Delete 3-node Elasticsearch cluster (Ubuntu)
+
 orb-delete-vm-rtcd-rocky: ## Delete RTCD VM (Rocky)
 	@orb delete -f rtcd-rocky 2>/dev/null || true
 	@echo "✓ RTCD VM deleted"
@@ -222,9 +302,9 @@ orb-delete-vm-rtcd-ubuntu: ## Delete RTCD VM (Ubuntu)
 
 orb-delete-vms: orb-delete-vms-rocky ## Delete core OrbStack VMs (default: Rocky)
 
-orb-delete-vms-all-rocky: orb-delete-vms-rocky orb-delete-vm-keycloak-rocky orb-delete-vm-minio-rocky orb-delete-vm-redis-rocky orb-delete-vm-rtcd-rocky ## Delete all Rocky VMs including optional services
+orb-delete-vms-all-rocky: orb-delete-vms-rocky orb-delete-vm-elasticsearch-rocky orb-delete-vm-keycloak-rocky orb-delete-vm-minio-rocky orb-delete-vm-redis-rocky orb-delete-vm-rtcd-rocky ## Delete all Rocky VMs including optional services
 
-orb-delete-vms-all-ubuntu: orb-delete-vms-ubuntu orb-delete-vm-keycloak-ubuntu orb-delete-vm-minio-ubuntu orb-delete-vm-redis-ubuntu orb-delete-vm-rtcd-ubuntu ## Delete all Ubuntu VMs including optional services
+orb-delete-vms-all-ubuntu: orb-delete-vms-ubuntu orb-delete-vm-elasticsearch-ubuntu orb-delete-vm-keycloak-ubuntu orb-delete-vm-minio-ubuntu orb-delete-vm-redis-ubuntu orb-delete-vm-rtcd-ubuntu ## Delete all Ubuntu VMs including optional services
 
 orb-delete-vms-rocky: ## Delete core Rocky Linux VMs
 	@echo "Deleting core Rocky Linux VMs..."

@@ -1,0 +1,66 @@
+---
+# Elasticsearch role default variables
+
+# Version and installation
+# Supported: "8" for Elasticsearch 8.x, "7" for Elasticsearch 7.17+
+# Note: ES 8.x removed bootstrap.system_call_filter option, so containerized
+# environments without seccomp support should use ES 7.17
+elasticsearch_major_version: "8"
+elasticsearch_version: "8.16.1"  # Full version for download
+elasticsearch_install_path: /usr/share/elasticsearch
+elasticsearch_config_path: /etc/elasticsearch
+elasticsearch_data_path: /var/lib/elasticsearch
+elasticsearch_log_path: /var/log/elasticsearch
+elasticsearch_user: elasticsearch
+elasticsearch_group: elasticsearch
+
+# Network configuration
+elasticsearch_network_host: "0.0.0.0"  # Listen on all interfaces (use firewall to restrict)
+elasticsearch_http_port: 9200
+elasticsearch_transport_port: 9300
+
+# Cluster configuration
+elasticsearch_cluster_name: "mattermost-elasticsearch"
+elasticsearch_node_name: "{{ ansible_hostname }}"
+
+# Cluster mode: "single" for single-node, "multi" for multi-node cluster
+# For production deployments with 5M+ posts, use multi-node cluster (2-4 nodes recommended)
+elasticsearch_cluster_mode: "single"
+
+# Multi-node cluster discovery settings (only used when elasticsearch_cluster_mode == "multi")
+# These are auto-configured from inventory in most cases, but can be overridden
+elasticsearch_discovery_seed_hosts: []  # List of seed hosts for cluster discovery (e.g., ["es1:9300", "es2:9300"])
+elasticsearch_initial_master_nodes: []  # List of initial master nodes for bootstrap (e.g., ["es1", "es2", "es3"])
+                                        # NOTE: Remove from config after cluster is formed!
+
+# Node roles (for multi-node clusters)
+# For Mattermost use case, typically all nodes have all roles (mixed deployment)
+elasticsearch_node_master: true   # Can this node be elected as master
+elasticsearch_node_data: true     # Can this node store data
+elasticsearch_node_ingest: true   # Can this node perform ingest pipelines
+elasticsearch_node_ml: false      # Machine learning role (disable for Mattermost)
+
+# Memory configuration (heap size)
+# Recommended: Set to 50% of available RAM, but not more than 32GB
+elasticsearch_heap_size: "1g"
+
+# Security configuration (ES8 requires these, ES7 optional)
+elasticsearch_enable_security: "{{ 'true' if elasticsearch_major_version == '8' else 'false' }}"
+elasticsearch_username: "elastic"
+elasticsearch_password: ""  # Set via group_vars or host_vars for security
+
+# Additional ES8 settings
+elasticsearch_action_destructive_requires_name: "false"  # Required for Mattermost
+elasticsearch_system_call_filter: "true"  # Set to "false" for containerized/VM environments without seccomp support
+
+# Plugin configuration
+elasticsearch_install_icu_plugin: true
+
+# Firewall configuration
+elasticsearch_firewall_enabled: true
+elasticsearch_firewall_allowed_sources: []  # List of IP addresses or CIDR ranges to allow
+
+# OpenSearch alternative (set to true to install OpenSearch instead of Elasticsearch)
+elasticsearch_use_opensearch: false
+opensearch_version: "2.18.0"
+opensearch_download_url: "https://artifacts.opensearch.org/releases/bundle/opensearch/{{ opensearch_version }}/opensearch-{{ opensearch_version }}-linux-x64.tar.gz"

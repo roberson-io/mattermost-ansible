@@ -45,3 +45,17 @@ mattermost_s3_access_key_id: ""  # S3 access key ID
 mattermost_s3_secret_access_key: ""  # S3 secret access key
 mattermost_s3_secure: true  # Use HTTPS for S3 endpoint
 mattermost_s3_path_prefix: ""  # Optional path prefix within bucket
+
+# Elasticsearch/OpenSearch configuration (optional)
+mattermost_enable_elasticsearch: false  # Set to true to enable Elasticsearch
+mattermost_elasticsearch_host: ""  # Elasticsearch host address (e.g., elasticsearch-host:9200)
+mattermost_elasticsearch_username: ""  # Elasticsearch username (for ES8)
+mattermost_elasticsearch_password: ""  # Elasticsearch password (for ES8)
+mattermost_elasticsearch_skip_tls_verification: false  # Skip TLS verification
+mattermost_elasticsearch_ca_path: ""  # Path to custom CA certificate file (PEM format, e.g., ./elasticsearch/ca.pem)
+mattermost_elasticsearch_client_cert_path: ""  # Path to client certificate for mTLS (PEM format, e.g., ./elasticsearch/client-cert.pem)
+mattermost_elasticsearch_client_key_path: ""  # Path to client certificate key for mTLS (PEM format, e.g., ./elasticsearch/client-key.pem)
+mattermost_elasticsearch_enable_indexing: true  # Enable automatic indexing
+mattermost_elasticsearch_enable_searching: true  # Enable search queries
+mattermost_elasticsearch_enable_autocomplete: true  # Enable autocomplete
+mattermost_elasticsearch_sniff: false  # Enable sniffing (cluster discovery)

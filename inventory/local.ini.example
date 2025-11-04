@@ -34,6 +34,36 @@ YOUR_USER@YOUR_APP_HOST
 # Example: your_user@minio@orb
 # YOUR_USER@YOUR_MINIO_HOST
 
+[redis]
+# Optional: Enable Redis cache by uncommenting and configuring
+# Example: your_user@redis@orb
+# YOUR_USER@YOUR_REDIS_HOST
+
+# Elasticsearch search (optional, supports single-node or multi-node cluster)
+# Single-node deployment (development/small scale):
+# [elasticsearch]
+# YOUR_USER@YOUR_ELASTICSEARCH_HOST
+
+# Multi-node cluster deployment (production/enterprise scale, 2-4 nodes recommended):
+# Uncomment and configure multiple elasticsearch instances
+# [elasticsearch1]
+# Example: your_user@elasticsearch1@orb
+# YOUR_USER@YOUR_ELASTICSEARCH1_HOST
+
+# [elasticsearch2]
+# Example: your_user@elasticsearch2@orb
+# YOUR_USER@YOUR_ELASTICSEARCH2_HOST
+
+# [elasticsearch3]
+# Example: your_user@elasticsearch3@orb
+# YOUR_USER@YOUR_ELASTICSEARCH3_HOST
+
+# Parent group for all elasticsearch instances (required for multi-node)
+[elasticsearch:children]
+# elasticsearch1
+# elasticsearch2
+# elasticsearch3
+
 [keycloak]
 # Optional: Enable Keycloak identity provider by uncommenting and configuring
 # Example: your_user@keycloak@orb
@@ -59,6 +89,8 @@ database
 app
 rtcd
 minio
+redis
+elasticsearch
 keycloak
 ldap
 

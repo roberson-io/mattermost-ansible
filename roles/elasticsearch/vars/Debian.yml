@@ -1,0 +1,16 @@
+---
+# Debian/Ubuntu specific variables
+
+elasticsearch_dependencies:
+  - apt-transport-https
+  - ca-certificates
+  - gnupg
+  - wget
+
+elasticsearch_java_package: "openjdk-11-jre-headless"
+
+# APT repository configuration
+elasticsearch_gpg_key_url: "https://artifacts.elastic.co/GPG-KEY-elasticsearch"
+elasticsearch_gpg_key_path: "/usr/share/keyrings/elasticsearch-keyring.gpg"
+elasticsearch_apt_repo: "deb [signed-by={{ elasticsearch_gpg_key_path }}] https://artifacts.elastic.co/packages/{{ elasticsearch_major_version }}.x/apt stable main"
+elasticsearch_apt_repo_file: "/etc/apt/sources.list.d/elasticsearch-{{ elasticsearch_major_version }}.x.list"

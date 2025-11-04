@@ -794,6 +794,172 @@
   when: mattermost_enable_s3 | default(false)
 
 #
+# Elasticsearch/OpenSearch configuration (optional)
+#
+- name: Gather facts from elasticsearch host
+  ansible.builtin.setup:
+  delegate_to: "{{ item }}"
+  delegate_facts: true
+  loop: "{{ groups.get('elasticsearch', []) }}"
+  when:
+    - mattermost_enable_elasticsearch | default(false)
+    - groups.get('elasticsearch', []) | length > 0
+
+- name: Set Elasticsearch host from facts
+  ansible.builtin.set_fact:
+    mattermost_elasticsearch_host: "{{ hostvars[groups['elasticsearch'][0]]['ansible_default_ipv4']['address'] }}:9200"
+  when:
+    - mattermost_enable_elasticsearch | default(false)
+    - groups.get('elasticsearch', []) | length > 0
+    - mattermost_elasticsearch_host == ""
+
+- name: Configure Elasticsearch backend type
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set ElasticsearchSettings.Backend elasticsearch
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when: mattermost_enable_elasticsearch | default(false)
+
+- name: Configure Elasticsearch connection URL
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set ElasticsearchSettings.ConnectionURL http://{{ mattermost_elasticsearch_host }}
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when: mattermost_enable_elasticsearch | default(false)
+
+- name: Configure Elasticsearch username
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set ElasticsearchSettings.Username '{{ mattermost_elasticsearch_username }}'
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when:
+    - mattermost_enable_elasticsearch | default(false)
+    - mattermost_elasticsearch_username | default('') | length > 0
+  no_log: true
+
+- name: Configure Elasticsearch password
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set ElasticsearchSettings.Password '{{ mattermost_elasticsearch_password }}'
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when:
+    - mattermost_enable_elasticsearch | default(false)
+    - mattermost_elasticsearch_password | default('') | length > 0
+  no_log: true
+
+- name: Configure Elasticsearch skip TLS verification
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set ElasticsearchSettings.SkipTLSVerification {{ mattermost_elasticsearch_skip_tls_verification | lower }}
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when: mattermost_enable_elasticsearch | default(false)
+
+- name: Configure Elasticsearch enable indexing
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set ElasticsearchSettings.EnableIndexing {{ mattermost_elasticsearch_enable_indexing | lower }}
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when: mattermost_enable_elasticsearch | default(false)
+
+- name: Configure Elasticsearch enable searching
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set ElasticsearchSettings.EnableSearching {{ mattermost_elasticsearch_enable_searching | lower }}
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when: mattermost_enable_elasticsearch | default(false)
+
+- name: Configure Elasticsearch enable autocomplete
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set ElasticsearchSettings.EnableAutocomplete {{ mattermost_elasticsearch_enable_autocomplete | lower }}
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when: mattermost_enable_elasticsearch | default(false)
+
+- name: Configure Elasticsearch sniff
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set ElasticsearchSettings.Sniff {{ mattermost_elasticsearch_sniff | lower }}
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when: mattermost_enable_elasticsearch | default(false)
+
+- name: Configure Elasticsearch CA path
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set ElasticsearchSettings.CA '{{ mattermost_elasticsearch_ca_path }}'
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when:
+    - mattermost_enable_elasticsearch | default(false)
+    - mattermost_elasticsearch_ca_path | default('') | length > 0
+
+- name: Configure Elasticsearch client certificate path
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set ElasticsearchSettings.ClientCert '{{ mattermost_elasticsearch_client_cert_path }}'
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when:
+    - mattermost_enable_elasticsearch | default(false)
+    - mattermost_elasticsearch_client_cert_path | default('') | length > 0
+
+- name: Configure Elasticsearch client key path
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set ElasticsearchSettings.ClientKey '{{ mattermost_elasticsearch_client_key_path }}'
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when:
+    - mattermost_enable_elasticsearch | default(false)
+    - mattermost_elasticsearch_client_key_path | default('') | length > 0
+
+- name: Restart Mattermost to apply Elasticsearch configuration
+  ansible.builtin.systemd:
+    name: mattermost
+    state: restarted
+  become: true
+  when: mattermost_enable_elasticsearch | default(false)
+
+- name: Wait for Mattermost to be ready after Elasticsearch config
+  ansible.builtin.uri:
+    url: "{{ mattermost_site_url }}/api/v4/system/ping"
+    status_code: 200
+  register: mattermost_elasticsearch_ping
+  until: mattermost_elasticsearch_ping.status == 200
+  retries: 30
+  delay: 2
+  when: mattermost_enable_elasticsearch | default(false)
+
+- name: Display Elasticsearch configuration status
+  ansible.builtin.debug:
+    msg:
+      - "Elasticsearch configured successfully"
+      - "Connection: {{ mattermost_elasticsearch_host }}"
+      - "Automatic indexing is enabled for new content"
+      - "For bulk indexing of existing content, use System Console > Environment > Elasticsearch > Index Now"
+  when: mattermost_enable_elasticsearch | default(false)
+
+#
 # Boards plugin installation (optional)
 #
 - name: Wait for Mattermost to be ready (for Boards plugin)

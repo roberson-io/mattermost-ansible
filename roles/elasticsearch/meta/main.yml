@@ -1,0 +1,25 @@
+---
+galaxy_info:
+  role_name: elasticsearch
+  author: Mattermost Ansible
+  description: Install and configure Elasticsearch or OpenSearch for Mattermost
+  license: MIT
+  min_ansible_version: "2.15"
+
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+
+  galaxy_tags:
+    - elasticsearch
+    - opensearch
+    - search
+    - mattermost
+
+dependencies: []

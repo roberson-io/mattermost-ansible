@@ -83,6 +83,20 @@ mattermost_boards_version: "9.1.7"
 # mattermost_redis_password: "{{ vault_local_redis_password }}"
 # redis_requirepass: "{{ vault_local_redis_password }}"
 
+# Elasticsearch Search configuration (optional)
+# Enable Elasticsearch by setting enable_elasticsearch to true and configuring an elasticsearch host in inventory
+# Note: Local development uses Elasticsearch 7.17 due to OrbStack/Docker seccomp limitations
+# Production/staging should use Elasticsearch 8.x (default)
+# enable_elasticsearch: true
+# mattermost_enable_elasticsearch: true
+# elasticsearch_major_version: "7"  # Use "7" for local (OrbStack), "8" for production
+# elasticsearch_version: "7.17.27"  # Specific version
+# elasticsearch_system_call_filter: "false"  # Required for containerized environments without seccomp
+# Elasticsearch connection is auto-configured from inventory
+# Optional: Set these if using ES8 with security enabled
+# mattermost_elasticsearch_username: "elastic"
+# mattermost_elasticsearch_password: "{{ vault_local_elasticsearch_password }}"
+
 # No nginx/TLS for local development
 use_nginx: false
 use_tls: false

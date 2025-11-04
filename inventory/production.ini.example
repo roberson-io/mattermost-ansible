@@ -14,6 +14,31 @@ app.example.com ansible_user=ubuntu
 # Optional: Enable MinIO object storage by uncommenting and configuring
 # minio.example.com ansible_user=ubuntu
 
+[redis]
+# Optional: Enable Redis cache by uncommenting and configuring
+# redis.example.com ansible_user=ubuntu
+
+# Elasticsearch search (optional, supports single-node or multi-node cluster)
+# Single-node deployment (small scale):
+# [elasticsearch]
+# elasticsearch.example.com ansible_user=ubuntu
+
+# Multi-node cluster deployment (enterprise scale with 5M+ posts, 2-4 nodes recommended):
+# [elasticsearch1]
+# elasticsearch1.example.com ansible_user=ubuntu
+
+# [elasticsearch2]
+# elasticsearch2.example.com ansible_user=ubuntu
+
+# [elasticsearch3]
+# elasticsearch3.example.com ansible_user=ubuntu
+
+# Parent group for all elasticsearch instances (required for multi-node)
+[elasticsearch:children]
+# elasticsearch1
+# elasticsearch2
+# elasticsearch3
+
 [keycloak]
 # Optional: Enable Keycloak identity provider by uncommenting and configuring
 # keycloak.example.com ansible_user=ubuntu
@@ -36,6 +61,8 @@ database
 app
 rtcd
 minio
+redis
+elasticsearch
 keycloak
 ldap
 

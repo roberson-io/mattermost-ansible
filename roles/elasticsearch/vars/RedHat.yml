@@ -1,0 +1,14 @@
+---
+# RedHat/Rocky Linux specific variables
+
+elasticsearch_dependencies:
+  - ca-certificates
+  - wget
+
+elasticsearch_java_package: "java-11-openjdk-headless"
+
+# YUM repository configuration
+elasticsearch_gpg_key_url: "https://artifacts.elastic.co/GPG-KEY-elasticsearch"
+elasticsearch_gpg_key_path: "/etc/pki/rpm-gpg/GPG-KEY-elasticsearch"
+elasticsearch_yum_repo_file: "/etc/yum.repos.d/elasticsearch.repo"
+elasticsearch_yum_repo_baseurl: "https://artifacts.elastic.co/packages/{{ elasticsearch_major_version }}.x/yum"
