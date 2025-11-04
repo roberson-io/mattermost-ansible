@@ -16,6 +16,20 @@ mattermost_db_name: mattermost
 mattermost_db_user: mmuser
 mattermost_db_password: "mmuser_password_change_me"
 
+# Database read replicas for HA (optional)
+# List of read replica connection strings for load balancing read queries
+# Format: "postgres://user:password@host:port/dbname?sslmode=disable"
+# Example:
+#   mattermost_db_replicas:
+#     - "postgres://mmuser:password@replica1.example.com:5432/mattermost?sslmode=disable"
+#     - "postgres://mmuser:password@replica2.example.com:5432/mattermost?sslmode=disable"
+mattermost_db_replicas: []
+
+# Database search replicas for HA (optional)
+# Dedicated replicas for search queries to isolate search load
+# Same format as mattermost_db_replicas
+mattermost_db_search_replicas: []
+
 # Site configuration
 mattermost_site_url: "http://{{ ansible_default_ipv4.address }}:8065"
 mattermost_listen_address: ":8065"
@@ -59,3 +73,18 @@ mattermost_elasticsearch_enable_indexing: true  # Enable automatic indexing
 mattermost_elasticsearch_enable_searching: true  # Enable search queries
 mattermost_elasticsearch_enable_autocomplete: true  # Enable autocomplete
 mattermost_elasticsearch_sniff: false  # Enable sniffing (cluster discovery)
+
+# High Availability cluster configuration (optional)
+# Requires: mattermost_config_storage: "database" and mattermost_enable_s3: true
+mattermost_enable_cluster: false  # Set to true to enable HA cluster mode
+mattermost_cluster_name: "production"  # Name of the cluster (e.g., production, staging)
+mattermost_cluster_use_ip_address: true  # Use IP addresses instead of hostnames for cluster communication
+mattermost_cluster_override_hostname: ""  # Optional: Manually set the advertise address (leave empty for auto-detect)
+mattermost_gossip_port: 8074  # Port for gossip protocol communication between cluster nodes
+mattermost_streaming_port: 8075  # Port for streaming API communication between cluster nodes
+mattermost_cluster_read_only_config: true  # Make config.json read-only (recommended for HA)
+
+# System limits for HA cluster (recommended by Mattermost)
+mattermost_configure_system_limits: false  # Set to true to configure system limits for HA
+mattermost_max_open_files: 65536  # Maximum open files (ulimit -n)
+mattermost_max_processes: 8192  # Maximum processes (ulimit -u)

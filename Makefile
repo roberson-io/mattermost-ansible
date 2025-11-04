@@ -1,4 +1,4 @@
-.PHONY: help ci clean clean-all deploy-local deploy-local-check deploy-production deploy-production-check deploy-staging deploy-staging-check install lint lint-fix orb-create-vms orb-create-vms-rocky orb-create-vms-ubuntu orb-delete-vms orb-delete-vms-rocky orb-delete-vms-ubuntu ping-local ping-production ping-staging safety-check setup syntax-check test test-all test-certbot test-integration test-integration-check-vms test-integration-db-config test-mattermost test-mattermost-boards test-mattermost-calls test-mattermost-db-config test-mattermost-migrate-to-db test-mattermost-rocky test-nginx test-nginx-rocky test-postgresql test-postgresql-rocky test-rocky test-rtcd test-ubuntu test-unit vault-create vault-create-secure vault-decrypt vault-edit vault-encrypt vault-rekey vault-view
+.PHONY: help ci clean clean-all deploy-local deploy-local-check deploy-production deploy-production-check deploy-staging deploy-staging-check install lint lint-fix orb-create-vm-loadbalancer-rocky orb-create-vm-loadbalancer-ubuntu orb-create-vms orb-create-vms-ha-cluster-rocky orb-create-vms-ha-cluster-ubuntu orb-create-vms-rocky orb-create-vms-ubuntu orb-delete-vm-loadbalancer-rocky orb-delete-vm-loadbalancer-ubuntu orb-delete-vms orb-delete-vms-ha-cluster-rocky orb-delete-vms-ha-cluster-ubuntu orb-delete-vms-rocky orb-delete-vms-ubuntu ping-local ping-production ping-staging safety-check setup syntax-check test test-all test-certbot test-integration test-integration-check-vms test-integration-db-config test-mattermost test-mattermost-boards test-mattermost-calls test-mattermost-db-config test-mattermost-migrate-to-db test-mattermost-rocky test-nginx test-nginx-rocky test-postgresql test-postgresql-rocky test-rocky test-rtcd test-ubuntu test-unit vault-create vault-create-secure vault-decrypt vault-edit vault-encrypt vault-rekey vault-view
 
 # Default target
 .DEFAULT_GOAL := help
@@ -42,6 +42,14 @@ deploy-local: ## Deploy to local VMs (inventory/local.ini)
 deploy-local-check: ## Dry-run deploy to local VMs
 	@echo "Checking local deployment (dry-run)..."
 	@$(VENV_ACTIVATE) && ansible-playbook -i inventory/local.ini site.yml --check --diff $(VAULT_PASS_ARG)
+
+deploy-local-ha: ## Deploy to local HA cluster (inventory/local-ha.ini)
+	@echo "Deploying to local HA cluster environment..."
+	@$(VENV_ACTIVATE) && ansible-playbook -i inventory/local-ha.ini site.yml $(VAULT_PASS_ARG)
+
+deploy-local-ha-check: ## Dry-run deploy to local HA cluster
+	@echo "Checking local HA cluster deployment (dry-run)..."
+	@$(VENV_ACTIVATE) && ansible-playbook -i inventory/local-ha.ini site.yml --check --diff $(VAULT_PASS_ARG)
 
 deploy-production: ## Deploy to production (inventory/production.ini)
 	@echo "Deploying to production environment..."
@@ -102,6 +110,16 @@ orb-create-vm-keycloak-ubuntu: ## Create Keycloak VM (Ubuntu)
 	@orb create -a amd64 ubuntu keycloak-ubuntu || echo "keycloak-ubuntu may already exist"
 	@echo "✓ Keycloak VM created. Add to inventory: [keycloak] $(USER)@keycloak-ubuntu@orb"
 
+orb-create-vm-app%-rocky: ## Create Mattermost app node VM (Rocky Linux 9) - Usage: make orb-create-vm-app1-rocky
+	@echo "Creating Mattermost app$* VM (Rocky Linux 9)..."
+	@orb create -a amd64 rocky:9 mattermost$*-rocky || echo "mattermost$*-rocky may already exist"
+	@echo "✓ Mattermost app$* VM created. Add to inventory: [app$*] $(USER)@mattermost$*-rocky@orb"
+
+orb-create-vm-app%-ubuntu: ## Create Mattermost app node VM (Ubuntu) - Usage: make orb-create-vm-app1-ubuntu
+	@echo "Creating Mattermost app$* VM (Ubuntu)..."
+	@orb create -a amd64 ubuntu mattermost$*-ubuntu || echo "mattermost$*-ubuntu may already exist"
+	@echo "✓ Mattermost app$* VM created. Add to inventory: [app$*] $(USER)@mattermost$*-ubuntu@orb"
+
 orb-create-vm-ldap%-rocky: ## Create OpenLDAP VM (Rocky Linux 9) - Usage: make orb-create-vm-ldap1-rocky
 	@echo "Creating OpenLDAP $* VM (Rocky Linux 9)..."
 	@orb create -a amd64 rocky:9 ldap$*-rocky || echo "ldap$*-rocky may already exist"
@@ -111,6 +129,16 @@ orb-create-vm-ldap%-ubuntu: ## Create OpenLDAP VM (Ubuntu) - Usage: make orb-cre
 	@echo "Creating OpenLDAP $* VM (Ubuntu)..."
 	@orb create -a amd64 ubuntu ldap$*-ubuntu || echo "ldap$*-ubuntu may already exist"
 	@echo "✓ OpenLDAP $* VM created. Add to inventory: [ldap$*] $(USER)@ldap$*-ubuntu@orb"
+
+orb-create-vm-loadbalancer-rocky: ## Create load balancer VM (Rocky Linux 9)
+	@echo "Creating load balancer VM (Rocky Linux 9)..."
+	@orb create -a amd64 rocky:9 loadbalancer-rocky || echo "loadbalancer-rocky may already exist"
+	@echo "✓ Load balancer VM created. Add to inventory: [loadbalancer] $(USER)@loadbalancer-rocky@orb"
+
+orb-create-vm-loadbalancer-ubuntu: ## Create load balancer VM (Ubuntu)
+	@echo "Creating load balancer VM (Ubuntu)..."
+	@orb create -a amd64 ubuntu loadbalancer-ubuntu || echo "loadbalancer-ubuntu may already exist"
+	@echo "✓ Load balancer VM created. Add to inventory: [loadbalancer] $(USER)@loadbalancer-ubuntu@orb"
 
 orb-create-vm-minio-rocky: ## Create MinIO VM (Rocky Linux 9)
 	@echo "Creating MinIO VM (Rocky Linux 9)..."
@@ -171,6 +199,56 @@ orb-create-vms-elasticsearch-cluster-rocky: orb-create-vm-elasticsearch1-rocky o
 
 orb-create-vms-elasticsearch-cluster-ubuntu: orb-create-vm-elasticsearch1-ubuntu orb-create-vm-elasticsearch2-ubuntu orb-create-vm-elasticsearch3-ubuntu ## Create 3-node Elasticsearch cluster (Ubuntu)
 	@echo "✓ Elasticsearch cluster VMs created. Configure inventory with [elasticsearch:children] pattern"
+
+orb-create-vms-ha-cluster-rocky: orb-create-vm-app1-rocky orb-create-vm-app2-rocky orb-create-vm-loadbalancer-rocky orb-create-vm-minio-rocky orb-create-vm-redis-rocky ## Create HA cluster VMs (Rocky: 2 app nodes, LB, MinIO, Redis)
+	@echo "✓ HA cluster VMs created (Rocky Linux 9)"
+	@echo ""
+	@echo "Update inventory/local.ini for HA cluster:"
+	@echo "  [app1]"
+	@echo "  $(USER)@mattermost1-rocky@orb"
+	@echo "  [app2]"
+	@echo "  $(USER)@mattermost2-rocky@orb"
+	@echo "  [app:children]"
+	@echo "  app1"
+	@echo "  app2"
+	@echo "  [loadbalancer]"
+	@echo "  $(USER)@loadbalancer-rocky@orb"
+	@echo "  [minio]"
+	@echo "  $(USER)@minio-rocky@orb"
+	@echo "  [redis]"
+	@echo "  $(USER)@redis-rocky@orb"
+	@echo ""
+	@echo "Configure group_vars/local.yml:"
+	@echo "  mattermost_config_storage: database"
+	@echo "  enable_minio: true"
+	@echo "  mattermost_enable_s3: true"
+	@echo "  enable_redis: true"
+	@echo "  mattermost_enable_cluster: true"
+
+orb-create-vms-ha-cluster-ubuntu: orb-create-vm-app1-ubuntu orb-create-vm-app2-ubuntu orb-create-vm-loadbalancer-ubuntu orb-create-vm-minio-ubuntu orb-create-vm-redis-ubuntu ## Create HA cluster VMs (Ubuntu: 2 app nodes, LB, MinIO, Redis)
+	@echo "✓ HA cluster VMs created (Ubuntu)"
+	@echo ""
+	@echo "Update inventory/local.ini for HA cluster:"
+	@echo "  [app1]"
+	@echo "  $(USER)@mattermost1-ubuntu@orb"
+	@echo "  [app2]"
+	@echo "  $(USER)@mattermost2-ubuntu@orb"
+	@echo "  [app:children]"
+	@echo "  app1"
+	@echo "  app2"
+	@echo "  [loadbalancer]"
+	@echo "  $(USER)@loadbalancer-ubuntu@orb"
+	@echo "  [minio]"
+	@echo "  $(USER)@minio-ubuntu@orb"
+	@echo "  [redis]"
+	@echo "  $(USER)@redis-ubuntu@orb"
+	@echo ""
+	@echo "Configure group_vars/local.yml:"
+	@echo "  mattermost_config_storage: database"
+	@echo "  enable_minio: true"
+	@echo "  mattermost_enable_s3: true"
+	@echo "  enable_redis: true"
+	@echo "  mattermost_enable_cluster: true"
 
 orb-create-vm-rtcd-rocky: ## Create RTCD VM (Rocky Linux 9)
 	@echo "Creating RTCD VM (Rocky Linux 9)..."
@@ -244,6 +322,22 @@ orb-delete-vm-ldap%-ubuntu: ## Delete OpenLDAP VM (Ubuntu) - Usage: make orb-del
 	@orb delete -f ldap$*-ubuntu 2>/dev/null || true
 	@echo "✓ OpenLDAP $* VM deleted"
 
+orb-delete-vm-loadbalancer-rocky: ## Delete load balancer VM (Rocky)
+	@orb delete -f loadbalancer-rocky 2>/dev/null || true
+	@echo "✓ Load balancer VM deleted"
+
+orb-delete-vm-loadbalancer-ubuntu: ## Delete load balancer VM (Ubuntu)
+	@orb delete -f loadbalancer-ubuntu 2>/dev/null || true
+	@echo "✓ Load balancer VM deleted"
+
+orb-delete-vm-app%-rocky: ## Delete Mattermost app node VM (Rocky) - Usage: make orb-delete-vm-app1-rocky
+	@orb delete -f mattermost$*-rocky 2>/dev/null || true
+	@echo "✓ Mattermost app$* VM deleted"
+
+orb-delete-vm-app%-ubuntu: ## Delete Mattermost app node VM (Ubuntu) - Usage: make orb-delete-vm-app1-ubuntu
+	@orb delete -f mattermost$*-ubuntu 2>/dev/null || true
+	@echo "✓ Mattermost app$* VM deleted"
+
 orb-delete-vm-minio-rocky: ## Delete MinIO VM (Rocky)
 	@orb delete -f minio-rocky 2>/dev/null || true
 	@echo "✓ MinIO VM deleted"
@@ -291,6 +385,12 @@ orb-delete-vm-elasticsearch3-ubuntu: ## Delete Elasticsearch node 3 VM (Ubuntu)
 orb-delete-vms-elasticsearch-cluster-rocky: orb-delete-vm-elasticsearch1-rocky orb-delete-vm-elasticsearch2-rocky orb-delete-vm-elasticsearch3-rocky ## Delete 3-node Elasticsearch cluster (Rocky)
 
 orb-delete-vms-elasticsearch-cluster-ubuntu: orb-delete-vm-elasticsearch1-ubuntu orb-delete-vm-elasticsearch2-ubuntu orb-delete-vm-elasticsearch3-ubuntu ## Delete 3-node Elasticsearch cluster (Ubuntu)
+
+orb-delete-vms-ha-cluster-rocky: orb-delete-vm-app1-rocky orb-delete-vm-app2-rocky orb-delete-vm-loadbalancer-rocky orb-delete-vm-minio-rocky orb-delete-vm-redis-rocky ## Delete HA cluster VMs (Rocky: 2 app nodes, LB, MinIO, Redis)
+	@echo "✓ HA cluster VMs deleted (Rocky Linux 9)"
+
+orb-delete-vms-ha-cluster-ubuntu: orb-delete-vm-app1-ubuntu orb-delete-vm-app2-ubuntu orb-delete-vm-loadbalancer-ubuntu orb-delete-vm-minio-ubuntu orb-delete-vm-redis-ubuntu ## Delete HA cluster VMs (Ubuntu: 2 app nodes, LB, MinIO, Redis)
+	@echo "✓ HA cluster VMs deleted (Ubuntu)"
 
 orb-delete-vm-rtcd-rocky: ## Delete RTCD VM (Rocky)
 	@orb delete -f rtcd-rocky 2>/dev/null || true

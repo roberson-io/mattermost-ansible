@@ -257,6 +257,110 @@
   notify: Restart postgresql
   when: postgresql_allow_remote
 
+- name: Configure PostgreSQL max_connections
+  ansible.builtin.lineinfile:
+    path: "{{ postgresql_conf_path }}"
+    regexp: "^#?max_connections"
+    line: "max_connections = {{ postgresql_max_connections }}"
+    state: present
+  notify: Restart postgresql
+
+- name: Configure PostgreSQL shared_buffers
+  ansible.builtin.lineinfile:
+    path: "{{ postgresql_conf_path }}"
+    regexp: "^#?shared_buffers"
+    line: "shared_buffers = {{ postgresql_shared_buffers }}"
+    state: present
+  notify: Restart postgresql
+
+- name: Configure PostgreSQL effective_cache_size
+  ansible.builtin.lineinfile:
+    path: "{{ postgresql_conf_path }}"
+    regexp: "^#?effective_cache_size"
+    line: "effective_cache_size = {{ postgresql_effective_cache_size }}"
+    state: present
+  notify: Restart postgresql
+
+- name: Configure PostgreSQL work_mem
+  ansible.builtin.lineinfile:
+    path: "{{ postgresql_conf_path }}"
+    regexp: "^#?work_mem"
+    line: "work_mem = {{ postgresql_work_mem }}"
+    state: present
+  notify: Restart postgresql
+
+- name: Configure PostgreSQL maintenance_work_mem
+  ansible.builtin.lineinfile:
+    path: "{{ postgresql_conf_path }}"
+    regexp: "^#?maintenance_work_mem"
+    line: "maintenance_work_mem = {{ postgresql_maintenance_work_mem }}"
+    state: present
+  notify: Restart postgresql
+
+- name: Configure PostgreSQL random_page_cost
+  ansible.builtin.lineinfile:
+    path: "{{ postgresql_conf_path }}"
+    regexp: "^#?random_page_cost"
+    line: "random_page_cost = {{ postgresql_random_page_cost }}"
+    state: present
+  notify: Restart postgresql
+
+- name: Configure PostgreSQL autovacuum_max_workers
+  ansible.builtin.lineinfile:
+    path: "{{ postgresql_conf_path }}"
+    regexp: "^#?autovacuum_max_workers"
+    line: "autovacuum_max_workers = {{ postgresql_autovacuum_max_workers }}"
+    state: present
+  notify: Restart postgresql
+
+- name: Configure PostgreSQL max_worker_processes
+  ansible.builtin.lineinfile:
+    path: "{{ postgresql_conf_path }}"
+    regexp: "^#?max_worker_processes"
+    line: "max_worker_processes = {{ postgresql_max_worker_processes }}"
+    state: present
+  notify: Restart postgresql
+
+- name: Configure PostgreSQL wal_level
+  ansible.builtin.lineinfile:
+    path: "{{ postgresql_conf_path }}"
+    regexp: "^#?wal_level"
+    line: "wal_level = {{ postgresql_wal_level }}"
+    state: present
+  notify: Restart postgresql
+
+- name: Configure PostgreSQL max_wal_senders
+  ansible.builtin.lineinfile:
+    path: "{{ postgresql_conf_path }}"
+    regexp: "^#?max_wal_senders"
+    line: "max_wal_senders = {{ postgresql_max_wal_senders }}"
+    state: present
+  notify: Restart postgresql
+
+- name: Configure PostgreSQL wal_keep_size
+  ansible.builtin.lineinfile:
+    path: "{{ postgresql_conf_path }}"
+    regexp: "^#?wal_keep_size"
+    line: "wal_keep_size = {{ postgresql_wal_keep_size }}"
+    state: present
+  notify: Restart postgresql
+
+- name: Configure PostgreSQL hot_standby
+  ansible.builtin.lineinfile:
+    path: "{{ postgresql_conf_path }}"
+    regexp: "^#?hot_standby"
+    line: "hot_standby = {{ postgresql_hot_standby }}"
+    state: present
+  notify: Restart postgresql
+
+- name: Configure PostgreSQL hot_standby_feedback
+  ansible.builtin.lineinfile:
+    path: "{{ postgresql_conf_path }}"
+    regexp: "^#?hot_standby_feedback"
+    line: "hot_standby_feedback = {{ postgresql_hot_standby_feedback }}"
+    state: present
+  notify: Restart postgresql
+
 - name: Configure PostgreSQL to allow remote connections for Mattermost
   ansible.builtin.lineinfile:
     path: "{{ postgresql_hba_path }}"

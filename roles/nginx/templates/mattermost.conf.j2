@@ -1,11 +1,24 @@
 upstream mattermost {
+{% if nginx_mode == "load_balancer" and nginx_upstream_servers | length > 0 %}
+    # Load balancer mode - multiple backend servers
+{% if nginx_lb_algorithm == "least_conn" %}
+    least_conn;
+{% elif nginx_lb_algorithm == "ip_hash" %}
+    ip_hash;
+{% endif %}
+{% for server in nginx_upstream_servers %}
+    server {{ server.host }}:{{ server.port }} max_fails={{ nginx_max_fails }} fail_timeout={{ nginx_fail_timeout }}s;
+{% endfor %}
+{% else %}
+    # Reverse proxy mode - single backend server
     server {{ nginx_upstream_host }}:{{ nginx_upstream_port }};
+{% endif %}
     keepalive 32;
 }
 
 proxy_cache_path /var/cache/nginx levels=1:2 keys_zone=mattermost_cache:10m max_size=3g inactive=120m use_temp_path=off;
 
-{% if nginx_force_https and nginx_ssl_enabled %}
+{% if nginx_force_https | bool and nginx_ssl_enabled | bool %}
 server {
     listen 80;
     server_name {{ nginx_server_name }};
@@ -14,7 +27,7 @@ server {
 {% endif %}
 
 server {
-{% if nginx_ssl_enabled %}
+{% if nginx_ssl_enabled | bool %}
     listen 443 ssl http2;
     ssl_certificate {{ nginx_ssl_cert_path }};
     ssl_certificate_key {{ nginx_ssl_key_path }};

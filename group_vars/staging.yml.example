@@ -9,6 +9,23 @@ postgresql_db_name: mattermost
 postgresql_db_user: mmuser
 postgresql_db_password: "{{ vault_staging_db_password }}"
 
+# PostgreSQL HA Performance Tuning (recommended for staging HA clusters)
+# Adjust based on available system resources
+# postgresql_max_connections: 512  # Lower than production for staging
+# postgresql_shared_buffers: "8GB"  # Adjust based on staging server RAM
+# postgresql_effective_cache_size: "24GB"  # Adjust based on staging server RAM
+# postgresql_work_mem: "16MB"  # For staging
+# postgresql_maintenance_work_mem: "512MB"  # For staging
+# postgresql_random_page_cost: 1.1  # For SSD storage
+# postgresql_autovacuum_max_workers: 3  # For staging
+# postgresql_max_worker_processes: 8  # For staging
+
+# Database Read Replicas for HA (optional)
+# mattermost_db_replicas:
+#   - "postgres://{{ postgresql_db_user }}:{{ vault_staging_db_password }}@replica1-staging.example.com:5432/{{ postgresql_db_name }}?sslmode=disable"
+# mattermost_db_search_replicas:
+#   - "postgres://{{ postgresql_db_user }}:{{ vault_staging_db_password }}@search-replica-staging.example.com:5432/{{ postgresql_db_name }}?sslmode=disable"
+
 # Mattermost configuration
 mattermost_version: "10.12.1"
 mattermost_db_host: "{{ hostvars[groups['database'][0]]['ansible_default_ipv4']['address'] }}"
@@ -117,3 +134,24 @@ certbot_create_if_missing: true
 # elasticsearch_cluster_mode: "multi"  # Set to "multi" for cluster, "single" for single-node
 # elasticsearch_heap_size: "8g"  # Adjust based on staging environment
 # Seed hosts and initial master nodes are auto-configured from inventory
+
+# High Availability cluster configuration (optional)
+# Requires: mattermost_config_storage: "database" and mattermost_enable_s3: true
+# Refer to Mattermost reference architectures for node count based on your scale
+# mattermost_enable_cluster: true
+# mattermost_cluster_name: "staging"
+# mattermost_cluster_use_ip_address: true
+# mattermost_gossip_port: 8074  # Port for gossip protocol communication
+# mattermost_streaming_port: 8075  # Port for streaming API communication
+# mattermost_cluster_read_only_config: true  # Make config.json read-only (recommended)
+# Load balancer configuration (required for HA cluster):
+# nginx_mode: "load_balancer"  # Automatically set when multiple app nodes detected
+# nginx_lb_algorithm: "ip_hash"  # Options: "round_robin", "least_conn", "ip_hash" (recommended for WebSocket)
+# nginx_max_fails: 3  # Failed health checks before marking server unavailable
+# nginx_fail_timeout: 30  # Seconds to mark server unavailable after max_fails
+
+# System Limits and Network Optimizations (recommended for HA cluster)
+# mattermost_configure_system_limits: true  # Configure ulimits for Mattermost
+# mattermost_max_open_files: 65536  # Maximum open files (ulimit -n)
+# mattermost_max_processes: 8192  # Maximum processes (ulimit -u)
+# mattermost_configure_network_optimizations: true  # Configure TCP/IP tuning for HA

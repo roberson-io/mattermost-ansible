@@ -82,6 +82,32 @@
       when: ansible_os_family == "RedHat"
       changed_when: false
 
+    - name: Validate NTP time synchronization for HA cluster
+      block:
+        - name: Check if chronyd is running (RedHat/Rocky)
+          ansible.builtin.systemd:
+            name: chronyd
+          register: chronyd_status
+          failed_when: false
+          when: ansible_os_family == "RedHat"
+
+        - name: Check if systemd-timesyncd is running (Debian/Ubuntu)
+          ansible.builtin.systemd:
+            name: systemd-timesyncd
+          register: timesyncd_status
+          failed_when: false
+          when: ansible_os_family == "Debian"
+
+        - name: Warn if time synchronization is not active
+          ansible.builtin.debug:
+            msg: "WARNING: Time synchronization service is not running. HA clusters require NTP synchronization."
+          when: >
+            (ansible_os_family == "RedHat" and (chronyd_status.status.ActiveState | default('inactive')) != 'active') or
+            (ansible_os_family == "Debian" and (timesyncd_status.status.ActiveState | default('inactive')) != 'active')
+      when:
+        - mattermost_enable_cluster | default(false)
+        - groups.app | default([]) | length > 1
+
     - name: Gather facts from database host
       ansible.builtin.setup:
       delegate_to: "{{ groups['database'][0] }}"
@@ -91,9 +117,17 @@
       ansible.builtin.set_fact:
         mattermost_db_host: "{{ hostvars[groups['database'][0]]['ansible_default_ipv4']['address'] }}"
 
-    - name: Set site URL from facts
+    - name: Set site URL from facts (single node)
       ansible.builtin.set_fact:
         mattermost_site_url: "http://{{ ansible_default_ipv4.address }}:8065"
+      when: groups.app | length == 1
+
+    - name: Set site URL from load balancer (HA cluster)
+      ansible.builtin.set_fact:
+        mattermost_site_url: "http://{{ hostvars[groups['loadbalancer'][0]]['ansible_default_ipv4']['address'] }}"
+      when:
+        - groups.app | length > 1
+        - groups.get('loadbalancer', []) | length > 0
 
     - name: Gather facts from rtcd host
       ansible.builtin.setup:
@@ -128,8 +162,41 @@
         - groups.get('minio', []) | length > 0
   roles:
     - mattermost
+
+- name: Deploy Load Balancer (nginx)
+  hosts: loadbalancer
+  become: true
+  gather_facts: true
+  pre_tasks:
+    - name: Install Python SELinux support (RedHat/Rocky)
+      ansible.builtin.raw: dnf install -y python3-libselinux
+      when: ansible_os_family == "RedHat"
+      changed_when: false
+
+    - name: Gather facts from all app nodes
+      ansible.builtin.setup:
+      delegate_to: "{{ item }}"
+      delegate_facts: true
+      loop: "{{ groups.app | default([]) }}"
+      when: groups.app | default([]) | length > 0
+
+    - name: Build upstream servers list for nginx
+      ansible.builtin.set_fact:
+        nginx_upstream_servers: >-
+          {{ groups.app | default([])
+             | map('extract', hostvars, ['ansible_default_ipv4', 'address'])
+             | map('regex_replace', '^(.*)$', '{"host": "\1", "port": 8065}')
+             | map('from_json')
+             | list }}
+      when: groups.app | default([]) | length > 1
+
+    - name: Set nginx to load balancer mode
+      ansible.builtin.set_fact:
+        nginx_mode: "load_balancer"
+      when: groups.app | default([]) | length > 1
+  roles:
     - role: nginx
-      when: use_nginx | default(false)
+      when: use_nginx | default(false) or groups.app | length > 1
     - role: certbot
       when: use_tls | default(false)
 

@@ -1,8 +1,32 @@
 ---
 # Nginx role default variables
 nginx_server_name: mattermost.example.com
+
+# Mode: "reverse_proxy" (single upstream) or "load_balancer" (multiple upstreams)
+nginx_mode: "reverse_proxy"
+
+# Single upstream configuration (reverse_proxy mode)
 nginx_upstream_host: localhost
 nginx_upstream_port: 8065
+
+# Multiple upstream configuration (load_balancer mode)
+# List of backend servers for load balancing
+# Example:
+#   nginx_upstream_servers:
+#     - { host: "10.0.1.10", port: 8065 }
+#     - { host: "10.0.1.11", port: 8065 }
+#     - { host: "10.0.1.12", port: 8065 }
+nginx_upstream_servers: []
+
+# Load balancing algorithm: "round_robin", "least_conn", or "ip_hash"
+# - round_robin: Default, distributes requests evenly
+# - least_conn: Sends requests to server with fewest active connections
+# - ip_hash: Ensures requests from same client IP go to same server (sticky sessions for WebSocket)
+nginx_lb_algorithm: "ip_hash"
+
+# Health check configuration
+nginx_max_fails: 3  # Number of failed attempts before marking server as unavailable
+nginx_fail_timeout: 30  # Time in seconds to mark server unavailable after max_fails
 
 # SSL/TLS configuration (paths will be set by certbot)
 nginx_ssl_enabled: true

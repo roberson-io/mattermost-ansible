@@ -5,7 +5,6 @@
 postgresql_version: "16"
 
 postgresql_listen_addresses: "*"
-postgresql_max_connections: 100
 
 # Database configuration
 # These should be overridden in group_vars to match mattermost settings
@@ -18,3 +17,32 @@ postgresql_allow_remote: true
 
 # Backup directory for PostgreSQL upgrades
 postgresql_backup_dir: "/var/backups/postgresql"
+
+# High Availability / Performance tuning settings
+# For HA cluster deployments, these should be tuned based on available system resources
+# Recommended values from Mattermost HA documentation for primary/writer node
+
+# Connection settings
+postgresql_max_connections: 100  # HA recommendation: 1024 for production clusters
+
+# Memory settings (adjust based on available RAM)
+postgresql_shared_buffers: "128MB"  # HA recommendation: 65% of total RAM for dedicated DB server
+postgresql_effective_cache_size: "4GB"  # HA recommendation: 65% of total RAM
+postgresql_work_mem: "4MB"  # HA recommendation: 32MB for primary, 16MB for replica
+postgresql_maintenance_work_mem: "64MB"  # HA recommendation: 1GB for production
+
+# Query planner settings
+postgresql_random_page_cost: 4.0  # HA recommendation: 1.1 for SSD storage
+
+# Autovacuum settings
+postgresql_autovacuum_max_workers: 3  # HA recommendation: 4 for production
+postgresql_max_worker_processes: 8  # HA recommendation: 12 for production
+
+# Write-Ahead Log (WAL) settings
+postgresql_wal_level: "replica"  # Required for replication
+postgresql_max_wal_senders: 10  # Number of concurrent replication connections
+postgresql_wal_keep_size: "1GB"  # Amount of WAL to retain for replicas (PostgreSQL 13+)
+
+# Replica-specific settings (only used on replica nodes)
+postgresql_hot_standby: "on"  # Allow read queries on replica
+postgresql_hot_standby_feedback: "on"  # Prevent query conflicts on replica

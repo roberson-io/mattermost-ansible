@@ -2,9 +2,33 @@
 # Replace with your production database server
 db.example.com ansible_user=ubuntu
 
+# Single-node Mattermost (default):
 [app]
 # Replace with your production app server
 app.example.com ansible_user=ubuntu
+
+# Multi-node Mattermost HA cluster (requires loadbalancer, MinIO, Redis, database config):
+# Uncomment and configure multiple app instances for HA cluster
+# Number of nodes depends on your reference architecture (see Mattermost scaling docs)
+# [app1]
+# app1.example.com ansible_user=ubuntu
+
+# [app2]
+# app2.example.com ansible_user=ubuntu
+
+# Add more app nodes as needed based on your reference architecture
+# [app3]
+# app3.example.com ansible_user=ubuntu
+
+# Parent group for all app instances (required for multi-node)
+# [app:children]
+# app1
+# app2
+# Add all app nodes here
+
+# Load balancer (nginx) - Required for multi-node HA cluster
+# [loadbalancer]
+# lb.example.com ansible_user=ubuntu
 
 [rtcd]
 # Optional: Enable Mattermost Calls by uncommenting and configuring
@@ -59,6 +83,7 @@ app.example.com ansible_user=ubuntu
 [production:children]
 database
 app
+loadbalancer
 rtcd
 minio
 redis

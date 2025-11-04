@@ -46,41 +46,65 @@ This document tracks the implementation of enterprise-scale features for the Mat
 ## Phase 2: High Availability Clustering
 
 ### Multi-Node Inventory Support
-- [ ] Update inventory examples to support multiple app nodes
-- [ ] Add `[loadbalancer]` host group to inventories
-- [ ] Create example 3-node cluster inventory
+- [x] Review Mattermost [High availability cluster-based deployment](https://docs.mattermost.com/administration-guide/scale/high-availability-cluster-based-deployment.html) documentation for details on required Mattermost, proxy server, and database configurations.
+- [x] Update inventory examples to support multiple Mattermost app nodes
+- [x] Add `[loadbalancer]` host group to inventories
+- [x] Create example multi-node cluster inventory pattern
 
 ### Mattermost Cluster Configuration
-- [ ] Add cluster variables to `roles/mattermost/defaults/main.yml`:
+- [x] Add cluster variables to `roles/mattermost/defaults/main.yml`:
   - `mattermost_enable_cluster`
   - `mattermost_cluster_name`
-  - `mattermost_cluster_bind_address`
-  - `mattermost_cluster_advertise_address`
+  - `mattermost_cluster_use_ip_address`
+  - `mattermost_cluster_override_hostname`
   - `mattermost_gossip_port`
   - `mattermost_streaming_port`
-- [ ] Add cluster prerequisite validation (database config mode, S3 storage)
-- [ ] Implement cluster configuration via mmctl
-- [ ] Add cluster node discovery/registration logic
-- [ ] Update site.yml to handle multi-node deployments
+  - `mattermost_cluster_read_only_config`
+- [x] Add cluster prerequisite validation (database config mode, S3 storage)
+- [x] Implement cluster configuration via mmctl
+- [x] Add cluster node discovery/registration logic
+- [x] Update site.yml to handle multi-node deployments
+- [x] Configure firewall rules for gossip and streaming ports
 
 ### nginx Load Balancer for HA
-- [ ] Extend existing `roles/nginx/` for load balancing mode
-- [ ] Add nginx upstream configuration for multiple app nodes
-- [ ] Configure round-robin or least-connected load balancing
-- [ ] Add health check support (`/api/v4/system/ping`)
-- [ ] Configure sticky sessions for WebSocket (ip_hash or sticky cookie)
-- [ ] Add load balancer-specific templates
-- [ ] Configure TLS termination at load balancer
-- [ ] Update nginx role variables for LB mode:
+- [x] Extend existing `roles/nginx/` for load balancing mode
+- [x] Add nginx upstream configuration for multiple app nodes
+- [x] Configure load balancing algorithms (round_robin, least_conn, ip_hash)
+- [x] Add health check support (max_fails, fail_timeout)
+- [x] Configure sticky sessions for WebSocket (ip_hash)
+- [x] Update nginx template for multi-node upstream configuration
+- [x] Configure TLS termination at load balancer (already supported)
+- [x] Update nginx role variables for LB mode:
   - `nginx_mode: "reverse_proxy"` or `"load_balancer"`
   - `nginx_upstream_servers: []` (list of Mattermost nodes)
+  - `nginx_lb_algorithm`, `nginx_max_fails`, `nginx_fail_timeout`
 - [ ] Create Molecule tests for nginx load balancer mode
 
+### PostgreSQL HA Configuration
+- [x] Add PostgreSQL performance tuning variables (max_connections, shared_buffers, etc.)
+- [x] Configure PostgreSQL memory settings (work_mem, maintenance_work_mem, effective_cache_size)
+- [x] Configure PostgreSQL query planner (random_page_cost for SSD)
+- [x] Configure PostgreSQL autovacuum and worker processes
+- [x] Configure PostgreSQL WAL settings for replication readiness
+- [x] Add replica-specific settings (hot_standby, hot_standby_feedback)
+- [x] Add support for DataSourceReplicas (read replicas for load balancing)
+- [x] Add support for DataSourceSearchReplicas (dedicated search replicas)
+- [x] Configure mmctl to set replica connection strings
+- [x] Document database load balancer / managed database recommendations
+
+### System Configuration
+- [x] Add system limits configuration (max open files: 65536, max processes: 8192)
+- [x] Configure ulimits via /etc/security/limits.conf
+- [x] Add NTP time synchronization validation
+- [x] Add TCP/IP network optimizations (tcp_tw_reuse, port ranges, keepalive, etc.)
+- [x] Configure sysctl parameters for HA cluster performance
+
 ### Documentation & Testing
-- [ ] Update Makefile with HA cluster VM targets
-- [ ] Create integration tests for 3-node cluster
+- [x] Update Makefile with HA cluster VM targets
+- [x] Document PostgreSQL HA tuning parameters in group_vars examples
+- [x] Document system limits and network optimizations in group_vars examples
+- [ ] Create integration tests for multi-node cluster
 - [ ] Write `docs/high-availability.md` documentation
-- [ ] Document PostgreSQL HA considerations (external/managed DB recommended)
 
 ---
 

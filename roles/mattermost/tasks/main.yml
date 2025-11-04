@@ -209,6 +209,64 @@
     group: mattermost
     recurse: true
 
+#
+# System limits configuration for HA cluster (optional)
+#
+- name: Configure system limits for Mattermost user (max open files)
+  ansible.builtin.pam_limits:
+    domain: mattermost
+    limit_type: "{{ item }}"
+    limit_item: nofile
+    value: "{{ mattermost_max_open_files }}"
+  loop:
+    - soft
+    - hard
+  when: mattermost_configure_system_limits | default(false)
+
+- name: Configure system limits for Mattermost user (max processes)
+  ansible.builtin.pam_limits:
+    domain: mattermost
+    limit_type: "{{ item }}"
+    limit_item: nproc
+    value: "{{ mattermost_max_processes }}"
+  loop:
+    - soft
+    - hard
+  when: mattermost_configure_system_limits | default(false)
+
+- name: Display system limits configuration status
+  ansible.builtin.debug:
+    msg:
+      - "System limits configured for HA cluster"
+      - "Max open files: {{ mattermost_max_open_files }}"
+      - "Max processes: {{ mattermost_max_processes }}"
+  when: mattermost_configure_system_limits | default(false)
+
+#
+# TCP/IP network optimizations for HA cluster (optional)
+#
+- name: Configure TCP/IP network optimizations for HA cluster
+  ansible.posix.sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: true
+  loop:
+    - { name: "net.ipv4.tcp_tw_reuse", value: "1" }
+    - { name: "net.ipv4.ip_local_port_range", value: "10000 65000" }
+    - { name: "net.ipv4.tcp_fin_timeout", value: "30" }
+    - { name: "net.ipv4.tcp_keepalive_time", value: "300" }
+    - { name: "net.ipv4.tcp_keepalive_probes", value: "5" }
+    - { name: "net.ipv4.tcp_keepalive_intvl", value: "15" }
+    - { name: "net.core.somaxconn", value: "1024" }
+    - { name: "net.core.netdev_max_backlog", value: "5000" }
+  when: mattermost_configure_network_optimizations | default(false)
+
+- name: Display network optimizations configuration status
+  ansible.builtin.debug:
+    msg: "TCP/IP network optimizations configured for HA cluster"
+  when: mattermost_configure_network_optimizations | default(false)
+
 - name: Debug database host value
   ansible.builtin.debug:
     msg: "Database host will be: {{ mattermost_db_host | default('UNDEFINED') }}"
@@ -269,7 +327,7 @@
 
     - name: Wait for Mattermost to be ready for migration
       ansible.builtin.uri:
-        url: "{{ mattermost_site_url }}/api/v4/system/ping"
+        url: "http://localhost:8065/api/v4/system/ping"
         status_code: 200
       register: mattermost_migrate_ping
       until: mattermost_migrate_ping.status == 200
@@ -320,7 +378,7 @@
 
     - name: Wait for Mattermost to be ready after switching to file mode
       ansible.builtin.uri:
-        url: "{{ mattermost_site_url }}/api/v4/system/ping"
+        url: "http://localhost:8065/api/v4/system/ping"
         status_code: 200
       register: mattermost_file_mode_ping
       until: mattermost_file_mode_ping.status == 200
@@ -504,7 +562,7 @@
 
 - name: Wait for Mattermost to be ready (file config mode)
   ansible.builtin.uri:
-    url: "{{ mattermost_site_url }}/api/v4/system/ping"
+    url: "http://localhost:8065/api/v4/system/ping"
     status_code: 200
   register: mattermost_ping
   until: mattermost_ping.status == 200
@@ -516,7 +574,7 @@
 
 - name: Wait for Mattermost to be ready (database config mode for license)
   ansible.builtin.uri:
-    url: "{{ mattermost_site_url }}/api/v4/system/ping"
+    url: "http://localhost:8065/api/v4/system/ping"
     status_code: 200
   register: mattermost_db_license_ping
   until: mattermost_db_license_ping.status == 200
@@ -610,7 +668,7 @@
 
 - name: Wait for Mattermost to be ready after disabling Redis
   ansible.builtin.uri:
-    url: "{{ mattermost_site_url }}/api/v4/system/ping"
+    url: "http://localhost:8065/api/v4/system/ping"
     status_code: 200
   register: mattermost_ping_no_redis
   until: mattermost_ping_no_redis.status == 200
@@ -684,7 +742,7 @@
 
 - name: Wait for Mattermost to be ready after Redis config
   ansible.builtin.uri:
-    url: "{{ mattermost_site_url }}/api/v4/system/ping"
+    url: "http://localhost:8065/api/v4/system/ping"
     status_code: 200
   register: mattermost_ping_redis
   until: mattermost_ping_redis.status == 200
@@ -780,7 +838,7 @@
 
 - name: Wait for Mattermost to be ready after S3 config
   ansible.builtin.uri:
-    url: "{{ mattermost_site_url }}/api/v4/system/ping"
+    url: "http://localhost:8065/api/v4/system/ping"
     status_code: 200
   register: mattermost_s3_ping
   until: mattermost_s3_ping.status == 200
@@ -942,7 +1000,7 @@
 
 - name: Wait for Mattermost to be ready after Elasticsearch config
   ansible.builtin.uri:
-    url: "{{ mattermost_site_url }}/api/v4/system/ping"
+    url: "http://localhost:8065/api/v4/system/ping"
     status_code: 200
   register: mattermost_elasticsearch_ping
   until: mattermost_elasticsearch_ping.status == 200
@@ -964,7 +1022,7 @@
 #
 - name: Wait for Mattermost to be ready (for Boards plugin)
   ansible.builtin.uri:
-    url: "{{ mattermost_site_url }}/api/v4/system/ping"
+    url: "http://localhost:8065/api/v4/system/ping"
     status_code: 200
   register: mattermost_boards_ping
   until: mattermost_boards_ping.status == 200
@@ -1103,3 +1161,227 @@
   ansible.builtin.debug:
     msg: "Mattermost Boards plugin v{{ mattermost_boards_version }} installed and enabled"
   when: mattermost_enable_boards | default(false)
+
+#
+# High Availability cluster configuration (optional)
+#
+- name: Validate cluster prerequisites - database config storage
+  ansible.builtin.fail:
+    msg: >
+      High Availability cluster requires database config storage.
+      Set mattermost_config_storage: "database" in your group_vars.
+  when:
+    - mattermost_enable_cluster | default(false)
+    - mattermost_config_storage != "database"
+
+- name: Validate cluster prerequisites - S3 storage
+  ansible.builtin.fail:
+    msg: >
+      High Availability cluster requires S3/MinIO for shared file storage.
+      Set mattermost_enable_s3: true and configure S3 settings in your group_vars.
+  when:
+    - mattermost_enable_cluster | default(false)
+    - not (mattermost_enable_s3 | default(false))
+
+- name: Gather facts from all app nodes for cluster discovery
+  ansible.builtin.setup:
+  delegate_to: "{{ item }}"
+  delegate_facts: true
+  loop: "{{ groups.app | default([]) }}"
+  when:
+    - mattermost_enable_cluster | default(false)
+    - groups.app | default([]) | length > 1
+
+- name: Build cluster node list
+  ansible.builtin.set_fact:
+    mattermost_cluster_nodes: >-
+      {{ groups.app | default([])
+         | map('extract', hostvars, ['ansible_default_ipv4', 'address'])
+         | list }}
+  when:
+    - mattermost_enable_cluster | default(false)
+    - groups.app | default([]) | length > 1
+
+- name: Display cluster node information
+  ansible.builtin.debug:
+    msg:
+      - "Configuring HA cluster with {{ mattermost_cluster_nodes | length }} nodes"
+      - "Cluster nodes: {{ mattermost_cluster_nodes | join(', ') }}"
+      - "Cluster name: {{ mattermost_cluster_name }}"
+      - "Gossip port: {{ mattermost_gossip_port }}"
+  when:
+    - mattermost_enable_cluster | default(false)
+    - groups.app | default([]) | length > 1
+
+- name: Enable cluster mode
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set ClusterSettings.Enable true
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when: mattermost_enable_cluster | default(false)
+
+- name: Configure cluster name
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set ClusterSettings.ClusterName {{ mattermost_cluster_name }}
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when: mattermost_enable_cluster | default(false)
+
+- name: Configure cluster to use IP address
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set ClusterSettings.UseIPAddress {{ mattermost_cluster_use_ip_address | lower }}
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when: mattermost_enable_cluster | default(false)
+
+- name: Configure cluster override hostname
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set ClusterSettings.OverrideHostname {{ mattermost_cluster_override_hostname }}
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when:
+    - mattermost_enable_cluster | default(false)
+    - mattermost_cluster_override_hostname | default('') | length > 0
+
+- name: Configure gossip port
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set ClusterSettings.GossipPort {{ mattermost_gossip_port }}
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when: mattermost_enable_cluster | default(false)
+
+- name: Configure read-only config
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set ClusterSettings.ReadOnlyConfig {{ mattermost_cluster_read_only_config | lower }}
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when: mattermost_enable_cluster | default(false)
+
+- name: Configure firewall for gossip port (firewalld)
+  ansible.posix.firewalld:
+    port: "{{ mattermost_gossip_port }}/tcp"
+    permanent: true
+    state: enabled
+    immediate: true
+  when:
+    - mattermost_enable_cluster | default(false)
+    - ansible_facts.services['firewalld.service'] is defined
+    - ansible_facts.services['firewalld.service'].state == 'running'
+
+- name: Configure firewall for streaming port (firewalld)
+  ansible.posix.firewalld:
+    port: "{{ mattermost_streaming_port }}/tcp"
+    permanent: true
+    state: enabled
+    immediate: true
+  when:
+    - mattermost_enable_cluster | default(false)
+    - ansible_facts.services['firewalld.service'] is defined
+    - ansible_facts.services['firewalld.service'].state == 'running'
+
+- name: Configure firewall for gossip port (ufw)
+  community.general.ufw:
+    rule: allow
+    port: "{{ mattermost_gossip_port }}"
+    proto: tcp
+  when:
+    - mattermost_enable_cluster | default(false)
+    - ansible_facts.packages['ufw'] is defined
+
+- name: Configure firewall for streaming port (ufw)
+  community.general.ufw:
+    rule: allow
+    port: "{{ mattermost_streaming_port }}"
+    proto: tcp
+  when:
+    - mattermost_enable_cluster | default(false)
+    - ansible_facts.packages['ufw'] is defined
+
+- name: Restart Mattermost to apply cluster configuration
+  ansible.builtin.systemd:
+    name: mattermost
+    state: restarted
+  become: true
+  when: mattermost_enable_cluster | default(false)
+
+- name: Wait for Mattermost to be ready after cluster config
+  ansible.builtin.uri:
+    url: "http://localhost:8065/api/v4/system/ping"
+    status_code: 200
+  register: mattermost_cluster_ping
+  until: mattermost_cluster_ping.status == 200
+  retries: 30
+  delay: 2
+  when: mattermost_enable_cluster | default(false)
+
+- name: Display cluster configuration status
+  ansible.builtin.debug:
+    msg:
+      - "High Availability cluster configured"
+      - "Cluster name: {{ mattermost_cluster_name }}"
+      - "Cluster nodes: {{ mattermost_cluster_nodes | default([inventory_hostname]) | length }}"
+      - "Gossip port: {{ mattermost_gossip_port }}"
+      - "Streaming port: {{ mattermost_streaming_port }}"
+  when: mattermost_enable_cluster | default(false)
+
+#
+# Database read replicas configuration (optional)
+#
+- name: Configure database read replicas
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set SqlSettings.DataSourceReplicas '{{ mattermost_db_replicas | to_json }}'
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when:
+    - mattermost_db_replicas | default([]) | length > 0
+
+- name: Configure database search replicas
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set SqlSettings.DataSourceSearchReplicas '{{ mattermost_db_search_replicas | to_json }}'
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when:
+    - mattermost_db_search_replicas | default([]) | length > 0
+
+- name: Restart Mattermost to apply database replica configuration
+  ansible.builtin.systemd:
+    name: mattermost
+    state: restarted
+  become: true
+  when:
+    - (mattermost_db_replicas | default([]) | length > 0) or (mattermost_db_search_replicas | default([]) | length > 0)
+
+- name: Wait for Mattermost to be ready after replica config
+  ansible.builtin.uri:
+    url: "http://localhost:8065/api/v4/system/ping"
+    status_code: 200
+  register: mattermost_replica_ping
+  until: mattermost_replica_ping.status == 200
+  retries: 30
+  delay: 2
+  when:
+    - (mattermost_db_replicas | default([]) | length > 0) or (mattermost_db_search_replicas | default([]) | length > 0)
+
+- name: Display database replica configuration status
+  ansible.builtin.debug:
+    msg:
+      - "Database read replicas configured: {{ mattermost_db_replicas | length }}"
+      - "Database search replicas configured: {{ mattermost_db_search_replicas | length }}"
+  when:
+    - (mattermost_db_replicas | default([]) | length > 0) or (mattermost_db_search_replicas | default([]) | length > 0)
