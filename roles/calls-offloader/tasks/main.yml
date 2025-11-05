@@ -1,0 +1,87 @@
+---
+# calls-offloader role installation and configuration tasks
+
+- name: Create calls-offloader group
+  ansible.builtin.group:
+    name: "{{ calls_offloader_group }}"
+    state: present
+    system: true
+
+- name: Create calls-offloader user
+  ansible.builtin.user:
+    name: "{{ calls_offloader_user }}"
+    group: "{{ calls_offloader_group }}"
+    groups: docker
+    append: true
+    shell: /bin/bash
+    system: true
+    create_home: false
+
+- name: Create installation directory
+  ansible.builtin.file:
+    path: "{{ calls_offloader_install_dir }}"
+    state: directory
+    owner: "{{ calls_offloader_user }}"
+    group: "{{ calls_offloader_group }}"
+    mode: '0755'
+
+- name: Create configuration directory
+  ansible.builtin.file:
+    path: "{{ calls_offloader_config_dir }}"
+    state: directory
+    owner: "{{ calls_offloader_user }}"
+    group: "{{ calls_offloader_group }}"
+    mode: '0755'
+
+- name: Create log directory
+  ansible.builtin.file:
+    path: "{{ calls_offloader_log_dir }}"
+    state: directory
+    owner: "{{ calls_offloader_user }}"
+    group: "{{ calls_offloader_group }}"
+    mode: '0755'
+
+- name: Download calls-offloader binary
+  ansible.builtin.get_url:
+    url: "https://github.com/mattermost/calls-offloader/releases/download/{{ calls_offloader_version }}/calls-offloader-linux-amd64"
+    dest: "{{ calls_offloader_install_dir }}/calls-offloader"
+    owner: "{{ calls_offloader_user }}"
+    group: "{{ calls_offloader_group }}"
+    mode: '0755'
+  notify: restart calls-offloader
+
+- name: Create calls-offloader configuration
+  ansible.builtin.template:
+    src: config.toml.j2
+    dest: "{{ calls_offloader_config_dir }}/config.toml"
+    owner: "{{ calls_offloader_user }}"
+    group: "{{ calls_offloader_group }}"
+    mode: '0640'
+  notify: restart calls-offloader
+
+- name: Create systemd service file
+  ansible.builtin.template:
+    src: calls-offloader.service.j2
+    dest: /etc/systemd/system/calls-offloader.service
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart calls-offloader
+
+- name: Enable and start calls-offloader service
+  ansible.builtin.systemd:
+    name: calls-offloader
+    enabled: "{{ calls_offloader_service_enabled }}"
+    state: "{{ calls_offloader_service_state }}"
+    daemon_reload: true
+
+- name: Wait for calls-offloader to be ready
+  ansible.builtin.uri:
+    url: "http://localhost:4545/version"
+    method: GET
+    status_code: 200
+  register: offloader_health
+  retries: 5
+  delay: 2
+  until: offloader_health.status == 200
+  changed_when: false

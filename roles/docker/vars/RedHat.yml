@@ -1,0 +1,9 @@
+---
+# RedHat/Rocky specific variables
+
+docker_yum_gpg_key: "https://download.docker.com/linux/{{ (ansible_distribution == 'Fedora') | ternary('fedora','centos') }}/gpg"
+docker_yum_repo_url: "https://download.docker.com/linux/{{ (ansible_distribution == 'Fedora') | ternary('fedora','centos') }}/{{ ansible_distribution_major_version }}/x86_64/stable"
+docker_packages:
+  - "docker-{{ docker_edition }}"
+  - "docker-{{ docker_edition }}-cli"
+  - "containerd.io"

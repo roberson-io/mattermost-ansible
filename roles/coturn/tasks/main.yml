@@ -1,0 +1,209 @@
+---
+# coturn installation and configuration
+
+- name: Include OS-specific variables
+  ansible.builtin.include_vars: "{{ ansible_os_family }}.yml"
+  tags: coturn
+
+- name: Validate coturn static auth secret is set
+  ansible.builtin.fail:
+    msg: "coturn_static_auth_secret must be set (shared with rtcd)"
+  when:
+    - coturn_use_auth_secret | bool
+    - coturn_static_auth_secret | length == 0
+  tags: coturn
+
+- name: Update apt cache (Debian/Ubuntu)
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_os_family == "Debian"
+  tags: coturn
+
+- name: Install coturn from package repos (Debian/Ubuntu)
+  ansible.builtin.apt:
+    name: coturn
+    state: present
+  when:
+    - ansible_os_family == "Debian"
+    - not coturn_install_from_source
+  tags: coturn
+
+- name: Install EPEL repository (RedHat/Rocky)
+  ansible.builtin.dnf:
+    name: epel-release
+    state: present
+  when:
+    - ansible_os_family == "RedHat"
+    - not coturn_install_from_source
+  tags: coturn
+
+- name: Install coturn from package repos (RedHat/Rocky)
+  ansible.builtin.dnf:
+    name: coturn
+    state: present
+  when:
+    - ansible_os_family == "RedHat"
+    - not coturn_install_from_source
+  tags: coturn
+
+- name: Ensure coturn user exists
+  ansible.builtin.user:
+    name: "{{ coturn_user }}"
+    system: true
+    shell: /usr/sbin/nologin
+    home: /var/lib/turn
+    create_home: true
+  tags: coturn
+
+- name: Ensure coturn directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ coturn_user }}"
+    group: "{{ coturn_group }}"
+    mode: "0755"
+  loop:
+    - /etc/coturn
+    - /var/lib/turn
+    - /var/log
+  tags: coturn
+
+- name: Create turnserver configuration
+  ansible.builtin.template:
+    src: turnserver.conf.j2
+    dest: /etc/turnserver.conf
+    owner: "{{ coturn_user }}"
+    group: "{{ coturn_group }}"
+    mode: "0600"
+  notify: Restart coturn
+  tags: coturn
+
+- name: Enable coturn in default config (Debian/Ubuntu)
+  ansible.builtin.lineinfile:
+    path: /etc/default/coturn
+    regexp: '^#?TURNSERVER_ENABLED='
+    line: 'TURNSERVER_ENABLED=1'
+    create: true
+    mode: "0644"
+  when: ansible_os_family == "Debian"
+  notify: Restart coturn
+  tags: coturn
+
+- name: Check if firewalld is available (RedHat)
+  ansible.builtin.systemd:
+    name: firewalld
+  register: firewalld_status
+  failed_when: false
+  when:
+    - ansible_os_family == "RedHat"
+    - coturn_configure_firewall | bool
+  tags: coturn
+
+- name: Allow TURN port through firewall (firewalld - RedHat)
+  ansible.posix.firewalld:
+    port: "{{ coturn_listening_port }}/{{ item }}"
+    permanent: true
+    state: enabled
+    immediate: true
+  loop:
+    - tcp
+    - udp
+  when:
+    - ansible_os_family == "RedHat"
+    - coturn_configure_firewall | bool
+    - firewalld_status.status.ActiveState == "active"
+  tags: coturn
+
+- name: Allow TURNS port through firewall (firewalld - RedHat)
+  ansible.posix.firewalld:
+    port: "{{ coturn_tls_listening_port }}/tcp"
+    permanent: true
+    state: enabled
+    immediate: true
+  when:
+    - ansible_os_family == "RedHat"
+    - coturn_configure_firewall | bool
+    - coturn_tls_enabled | bool
+    - firewalld_status.status.ActiveState == "active"
+  tags: coturn
+
+- name: Allow relay port range through firewall (firewalld - RedHat)
+  ansible.posix.firewalld:
+    port: "{{ coturn_min_port }}-{{ coturn_max_port }}/{{ item }}"
+    permanent: true
+    state: enabled
+    immediate: true
+  loop:
+    - tcp
+    - udp
+  when:
+    - ansible_os_family == "RedHat"
+    - coturn_configure_firewall | bool
+    - firewalld_status.status.ActiveState == "active"
+  tags: coturn
+
+- name: Check if ufw is available (Debian/Ubuntu)
+  ansible.builtin.command: which ufw
+  register: ufw_check
+  failed_when: false
+  changed_when: false
+  when:
+    - ansible_os_family == "Debian"
+    - coturn_configure_firewall | bool
+  tags: coturn
+
+- name: Allow TURN port through firewall (ufw - Debian/Ubuntu)
+  community.general.ufw:
+    rule: allow
+    port: "{{ coturn_listening_port }}"
+    proto: "{{ item }}"
+  loop:
+    - tcp
+    - udp
+  when:
+    - ansible_os_family == "Debian"
+    - coturn_configure_firewall | bool
+    - ufw_check.rc == 0
+  tags: coturn
+
+- name: Allow TURNS port through firewall (ufw - Debian/Ubuntu)
+  community.general.ufw:
+    rule: allow
+    port: "{{ coturn_tls_listening_port }}"
+    proto: tcp
+  when:
+    - ansible_os_family == "Debian"
+    - coturn_configure_firewall | bool
+    - coturn_tls_enabled | bool
+    - ufw_check.rc == 0
+  tags: coturn
+
+- name: Allow relay port range through firewall (ufw - Debian/Ubuntu)
+  community.general.ufw:
+    rule: allow
+    port: "{{ coturn_min_port }}:{{ coturn_max_port }}"
+    proto: "{{ item }}"
+  loop:
+    - tcp
+    - udp
+  when:
+    - ansible_os_family == "Debian"
+    - coturn_configure_firewall | bool
+    - ufw_check.rc == 0
+  tags: coturn
+
+- name: Enable and start coturn service
+  ansible.builtin.systemd:
+    name: coturn
+    enabled: true
+    state: started
+    daemon_reload: true
+  tags: coturn
+
+- name: Wait for coturn to be ready
+  ansible.builtin.wait_for:
+    port: "{{ coturn_listening_port }}"
+    delay: 2
+    timeout: 30
+  tags: coturn

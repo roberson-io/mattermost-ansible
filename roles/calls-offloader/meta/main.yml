@@ -1,0 +1,26 @@
+---
+galaxy_info:
+  author: Mattermost Ansible Team
+  description: Install and configure Mattermost Calls Offloader service
+  license: MIT
+  min_ansible_version: "2.9"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+  galaxy_tags:
+    - mattermost
+    - calls
+    - webrtc
+
+dependencies:
+  - role: docker
+    vars:
+      docker_default_network_mode: "host"
+      docker_users:
+        - "{{ calls_offloader_user }}"

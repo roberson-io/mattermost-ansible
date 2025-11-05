@@ -138,9 +138,9 @@
         - enable_calls | default(false)
         - groups.get('rtcd', []) | length > 0
 
-    - name: Set rtcd host from facts
+    - name: Set rtcd URL for Mattermost Calls plugin
       ansible.builtin.set_fact:
-        mattermost_rtcd_host: "{{ hostvars[groups['rtcd'][0]]['ansible_default_ipv4']['address'] }}"
+        mattermost_calls_rtcd_url: "http://{{ hostvars[groups['rtcd'][0]]['ansible_default_ipv4']['address'] }}:8045"
       when:
         - enable_calls | default(false)
         - groups.get('rtcd', []) | length > 0
@@ -209,9 +209,40 @@
       ansible.builtin.raw: dnf install -y python3-libselinux
       when: ansible_os_family == "RedHat"
       changed_when: false
+
   roles:
     - role: rtcd
       when: enable_calls | default(false)
+
+- name: Deploy coturn TURN Server
+  hosts: coturn
+  become: true
+  gather_facts: true
+  pre_tasks:
+    - name: Install Python SELinux support (RedHat/Rocky)
+      ansible.builtin.raw: dnf install -y python3-libselinux
+      when: ansible_os_family == "RedHat"
+      changed_when: false
+  roles:
+    - role: coturn
+      when: enable_coturn | default(false)
+
+- name: Deploy calls-offloader Service
+  hosts: calls_offloader
+  become: true
+  gather_facts: true
+  pre_tasks:
+    - name: Install Python SELinux support (RedHat/Rocky)
+      ansible.builtin.raw: dnf install -y python3-libselinux
+      when: ansible_os_family == "RedHat"
+      changed_when: false
+
+  roles:
+    - role: docker
+    - role: calls-offloader
+      when:
+        - mattermost_calls_enable_recording | default(false)
+        - enable_calls | default(false)
 
 - name: Deploy Keycloak Service
   hosts: keycloak
@@ -293,8 +324,8 @@
           - "Mattermost deployment complete!"
           - "Access URL: {{ mattermost_site_url | default('http://localhost:8065') }}"
           - >-
-            RTCD URL: {{ 'http://' + mattermost_rtcd_host + ':8045'
-            if (enable_calls | default(false) and mattermost_rtcd_host is defined)
+            RTCD URL: {{ mattermost_calls_rtcd_url
+            if (enable_calls | default(false) and mattermost_calls_rtcd_url is defined)
             else 'Not configured' }}
           - >-
             MinIO URL: {{ 'http://' + mattermost_minio_host + ':9000'

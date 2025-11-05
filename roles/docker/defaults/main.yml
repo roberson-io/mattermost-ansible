@@ -1,0 +1,25 @@
+---
+# docker role default variables
+
+# Docker version
+docker_version: "latest"
+docker_edition: "ce"
+
+# Docker daemon configuration
+docker_daemon_options:
+  log-driver: "json-file"
+  log-opts:
+    max-size: "10m"
+    max-file: "3"
+  storage-driver: "overlay2"
+
+# Users who need docker group access
+docker_users: []
+
+# Service management
+docker_service_enabled: true
+docker_service_state: started
+
+# Optional: Install docker-compose
+docker_install_compose: false
+docker_compose_version: "2.24.0"

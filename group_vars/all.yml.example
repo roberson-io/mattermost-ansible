@@ -89,3 +89,17 @@ vault_staging_redis_password: "change_me_secure_password"
 
 # Production environment Redis password
 vault_production_redis_password: "change_me_secure_password"
+
+# =============================================================================
+# COTURN CREDENTIALS (TURN Server)
+# Shared secret used between coturn and rtcd for TURN authentication
+# =============================================================================
+
+# Local environment TURN static auth secret
+vault_local_turn_static_auth_secret: "change_me_secure_password"
+
+# Staging environment TURN static auth secret
+vault_staging_turn_static_auth_secret: "change_me_secure_password"
+
+# Production environment TURN static auth secret
+vault_production_turn_static_auth_secret: "change_me_secure_password"

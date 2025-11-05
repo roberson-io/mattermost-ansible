@@ -1,0 +1,111 @@
+---
+# docker role installation and configuration tasks
+
+- name: Include OS-specific variables
+  ansible.builtin.include_vars: "{{ ansible_os_family }}.yml"
+
+- name: Install prerequisites (Debian/Ubuntu)
+  ansible.builtin.apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+    state: present
+    update_cache: true
+  when: ansible_os_family == "Debian"
+
+- name: Install prerequisites (RedHat/Rocky)
+  ansible.builtin.yum:
+    name:
+      - yum-utils
+      - device-mapper-persistent-data
+      - lvm2
+    state: present
+  when: ansible_os_family == "RedHat"
+
+- name: Add Docker GPG key (Debian/Ubuntu)
+  ansible.builtin.apt_key:
+    url: "{{ docker_apt_gpg_key }}"
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: Add Docker repository (Debian/Ubuntu)
+  ansible.builtin.apt_repository:
+    repo: "{{ docker_apt_repo }}"
+    state: present
+    filename: docker
+  when: ansible_os_family == "Debian"
+
+- name: Add Docker repository (RedHat/Rocky)
+  ansible.builtin.yum_repository:
+    name: docker-ce-stable
+    description: Docker CE Stable
+    baseurl: "{{ docker_yum_repo_url }}"
+    gpgcheck: true
+    gpgkey: "{{ docker_yum_gpg_key }}"
+    enabled: true
+  when: ansible_os_family == "RedHat"
+
+- name: Install Docker packages (Debian/Ubuntu)
+  ansible.builtin.apt:
+    name: "{{ docker_packages }}"
+    state: present
+    update_cache: true
+  when: ansible_os_family == "Debian"
+  notify: restart docker
+
+- name: Install Docker packages (RedHat/Rocky)
+  ansible.builtin.yum:
+    name: "{{ docker_packages }}"
+    state: present
+  when: ansible_os_family == "RedHat"
+  notify: restart docker
+
+- name: Create Docker configuration directory
+  ansible.builtin.file:
+    path: /etc/docker
+    state: directory
+    mode: '0755'
+
+- name: Configure Docker daemon
+  ansible.builtin.template:
+    src: daemon.json.j2
+    dest: /etc/docker/daemon.json
+    mode: '0644'
+  notify: restart docker
+
+- name: Ensure Docker group exists
+  ansible.builtin.group:
+    name: docker
+    state: present
+
+- name: Add users to docker group
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: docker
+    append: true
+  loop: "{{ docker_users }}"
+  when: docker_users | length > 0
+
+- name: Enable and start Docker service
+  ansible.builtin.systemd:
+    name: docker
+    enabled: "{{ docker_service_enabled }}"
+    state: "{{ docker_service_state }}"
+
+- name: Wait for Docker to be ready
+  ansible.builtin.command: docker info
+  register: docker_info
+  retries: 5
+  delay: 2
+  until: docker_info.rc == 0
+  changed_when: false
+
+- name: Install Docker Compose
+  ansible.builtin.get_url:
+    url: "https://github.com/docker/compose/releases/download/v{{ docker_compose_version }}/docker-compose-{{ ansible_system }}-{{ ansible_architecture }}"
+    dest: /usr/local/bin/docker-compose
+    mode: '0755'
+  when: docker_install_compose | bool

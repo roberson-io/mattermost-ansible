@@ -10,8 +10,8 @@ postgresql_db_user: mmuser
 postgresql_db_password: "{{ vault_local_db_password }}"
 
 # Mattermost configuration
-# Note: mattermost_db_host and mattermost_site_url are set dynamically in site.yml
-# using facts gathered from the hosts
+# Note: mattermost_db_host, mattermost_site_url, and mattermost_calls_rtcd_url
+# are set dynamically in site.yml using facts gathered from the hosts
 
 # Configuration storage: "file" (default) or "database"
 # - "file": Config stored in config.json (suitable for single-server)
@@ -32,6 +32,37 @@ mattermost_service_environment: "test"  # Options: test, production, or dev
 # Mattermost Calls configuration (optional)
 # Enable Calls by setting enable_calls to true and configuring an rtcd host in inventory
 enable_calls: true
+
+# TURN Server (coturn) - Optional, for restrictive firewall environments
+# Uncomment if clients cannot connect via UDP due to firewall restrictions
+# enable_coturn: true
+# coturn_static_auth_secret: "{{ vault_local_turn_static_auth_secret }}"
+# rtcd_turn_static_auth_secret: "{{ vault_local_turn_static_auth_secret }}"
+# rtcd_turn_credentials_expiration_minutes: 1440  # 24 hours
+
+# Call Recording/Transcription - Optional, requires calls-offloader + Docker
+# mattermost_calls_enable_recording: true
+# mattermost_calls_job_service_url: "http://{{ hostvars[groups['calls_offloader'][0]]['ansible_default_ipv4']['address'] }}:4545"
+# mattermost_calls_recording_quality: "medium"  # Options: low, medium, high
+# mattermost_calls_max_recording_duration: 60  # Max minutes (0 = unlimited)
+# calls_offloader_max_concurrent_jobs: 2
+# calls_offloader_failed_jobs_retention_time: "30d"
+#
+# Call Transcription - Optional, requires recording to be enabled
+# mattermost_calls_enable_transcriptions: true
+# mattermost_calls_transcriber_model_size: "base"  # Options: tiny, base, small, medium
+# mattermost_calls_transcriber_num_threads: 2
+# mattermost_calls_transcribe_api: "whisper.cpp"  # Options: whisper.cpp, azure
+#
+# Live Captions - Optional, provides real-time captions during calls
+# mattermost_calls_enable_live_captions: false
+# mattermost_calls_live_captions_model_size: "tiny"
+# mattermost_calls_live_captions_language: "en"
+#
+# Additional Calls Settings
+# mattermost_calls_enable_ringing: true  # Enable ringing for DM/GM calls
+# mattermost_calls_max_call_participants: 0  # Max participants (0 = unlimited)
+# mattermost_calls_allow_screen_sharing: true
 
 # Mattermost Boards configuration (optional)
 # Enable Boards plugin for project management features

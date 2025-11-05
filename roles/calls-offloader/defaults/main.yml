@@ -1,0 +1,40 @@
+---
+# calls-offloader role default variables
+
+# Version
+calls_offloader_version: "v0.9.4"  # Latest stable version
+
+# Installation paths
+calls_offloader_install_dir: "/opt/calls-offloader"
+calls_offloader_config_dir: "/etc/calls-offloader"
+calls_offloader_log_dir: "/var/log/calls-offloader"
+
+# User and group
+calls_offloader_user: "calls-offloader"
+calls_offloader_group: "calls-offloader"
+
+# Service configuration
+calls_offloader_service_enabled: true
+calls_offloader_service_state: started
+
+# API configuration
+calls_offloader_api_listen_address: ":4545"  # HTTP API listen address
+calls_offloader_api_security_allow_self_registration: true  # Allow clients to self-register (safe for internal networks)
+calls_offloader_api_security_enable_admin: false
+calls_offloader_api_security_admin_secret_key: ""  # Set in vault for admin API access
+calls_offloader_session_cache_expiration_minutes: 1440  # Session cache expiration (24 hours)
+
+# Store configuration
+calls_offloader_data_source: "{{ calls_offloader_install_dir }}/offloader.db"  # SQLite database path
+
+# Job configuration (verified from config.sample.toml)
+calls_offloader_api_type: "docker"  # Job API type: docker or kubernetes
+calls_offloader_max_concurrent_jobs: 2  # Maximum concurrent jobs
+calls_offloader_failed_jobs_retention_time: "30d"  # Time to retain failed jobs (e.g., 30d, 24h)
+calls_offloader_image_registry: "mattermost"  # Docker image registry
+
+# Logging
+calls_offloader_log_level: "INFO"  # DEBUG, INFO, WARN, ERROR
+calls_offloader_log_enable_console: true
+calls_offloader_log_enable_file: true
+calls_offloader_log_file_location: "{{ calls_offloader_log_dir }}/calls-offloader.log"

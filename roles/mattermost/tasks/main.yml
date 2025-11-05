@@ -916,7 +916,9 @@
 - name: Configure Elasticsearch skip TLS verification
   ansible.builtin.command:
     cmd: >
-      {{ mattermost_install_path }}/bin/mmctl --local config set ElasticsearchSettings.SkipTLSVerification {{ mattermost_elasticsearch_skip_tls_verification | lower }}
+      {{ mattermost_install_path }}/bin/mmctl --local config set
+      ElasticsearchSettings.SkipTLSVerification
+      {{ mattermost_elasticsearch_skip_tls_verification | lower }}
   become: true
   become_user: mattermost
   changed_when: true
@@ -943,7 +945,9 @@
 - name: Configure Elasticsearch enable autocomplete
   ansible.builtin.command:
     cmd: >
-      {{ mattermost_install_path }}/bin/mmctl --local config set ElasticsearchSettings.EnableAutocomplete {{ mattermost_elasticsearch_enable_autocomplete | lower }}
+      {{ mattermost_install_path }}/bin/mmctl --local config set
+      ElasticsearchSettings.EnableAutocomplete
+      {{ mattermost_elasticsearch_enable_autocomplete | lower }}
   become: true
   become_user: mattermost
   changed_when: true
@@ -1385,3 +1389,81 @@
       - "Database search replicas configured: {{ mattermost_db_search_replicas | length }}"
   when:
     - (mattermost_db_replicas | default([]) | length > 0) or (mattermost_db_search_replicas | default([]) | length > 0)
+
+# ============================================================================
+# Calls Plugin Configuration
+# ============================================================================
+
+- name: Get current Mattermost configuration
+  ansible.builtin.command:
+    cmd: "{{ mattermost_install_path }}/bin/mmctl --local config show --json"
+  become: true
+  become_user: mattermost
+  register: mattermost_current_config
+  changed_when: false
+  when:
+    - mattermost_enable_calls | bool
+
+- name: Build Calls plugin configuration updates
+  ansible.builtin.set_fact:
+    mattermost_calls_config_patch:
+      PluginSettings:
+        PluginStates:
+          com.mattermost.calls:
+            Enable: true
+        Plugins:
+          com.mattermost.calls:
+            rtcdserviceurl: "{{ mattermost_calls_rtcd_url }}"
+            enablerecordings: "{{ mattermost_calls_enable_recording }}"
+            jobserviceurl: "{{ mattermost_calls_job_service_url }}"
+            recordingquality: "{{ mattermost_calls_recording_quality }}"
+            maxrecordingduration: "{{ mattermost_calls_max_recording_duration }}"
+            enabletranscriptions: "{{ mattermost_calls_enable_transcriptions }}"
+            transcribermodelsize: "{{ mattermost_calls_transcriber_model_size }}"
+            transcribernumthreads: "{{ mattermost_calls_transcriber_num_threads }}"
+            transcribeapi: "{{ mattermost_calls_transcribe_api }}"
+            enablelivecaptions: "{{ mattermost_calls_enable_live_captions }}"
+            livecaptionsmodelsize: "{{ mattermost_calls_live_captions_model_size }}"
+            livecaptionslanguage: "{{ mattermost_calls_live_captions_language }}"
+            icehostoverride: "{{ mattermost_calls_ice_host_override }}"
+            udpserverport: "{{ mattermost_calls_udp_server_port }}"
+            tcpserverport: "{{ mattermost_calls_tcp_server_port }}"
+            enableipv6: "{{ mattermost_calls_enable_ipv6 }}"
+            enableringing: "{{ mattermost_calls_enable_ringing }}"
+            maxcallparticipants: "{{ mattermost_calls_max_call_participants }}"
+            allowscreensharing: "{{ mattermost_calls_allow_screen_sharing }}"
+  when:
+    - mattermost_enable_calls | bool
+
+- name: Merge Calls configuration with current config
+  ansible.builtin.set_fact:
+    mattermost_updated_config: "{{ mattermost_current_config.stdout | from_json | combine(mattermost_calls_config_patch, recursive=true) }}"
+  when:
+    - mattermost_enable_calls | bool
+
+- name: Write updated configuration to temp file
+  ansible.builtin.copy:
+    content: "{{ mattermost_updated_config | to_nice_json }}"
+    dest: "/tmp/mattermost_config_patch.json"
+    owner: mattermost
+    group: mattermost
+    mode: '0600'
+  when:
+    - mattermost_enable_calls | bool
+
+- name: Apply Calls plugin configuration via mmctl config patch
+  ansible.builtin.command:
+    cmd: "{{ mattermost_install_path }}/bin/mmctl --local config patch /tmp/mattermost_config_patch.json"
+  become: true
+  become_user: mattermost
+  register: mattermost_calls_patch_result
+  changed_when: true
+  when:
+    - mattermost_enable_calls | bool
+
+- name: Remove temporary config file
+  ansible.builtin.file:
+    path: "/tmp/mattermost_config_patch.json"
+    state: absent
+  when:
+    - mattermost_enable_calls | bool

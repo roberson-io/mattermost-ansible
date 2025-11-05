@@ -1,0 +1,65 @@
+---
+# coturn role default variables
+
+# Installation method
+# coturn is installed from OS package repositories (apt/dnf)
+# Version depends on what's available in the repos
+coturn_install_from_source: false  # Source install not yet implemented
+
+# Network configuration
+coturn_listening_ip: "{{ ansible_default_ipv4.address }}"
+coturn_listening_port: 3478  # Standard TURN port (UDP/TCP)
+coturn_tls_listening_port: 5349  # Standard TURNS port (TLS)
+coturn_external_ip: ""  # Auto-detect if empty
+coturn_relay_ip: "{{ coturn_listening_ip }}"
+
+# Realm and server configuration
+coturn_realm: "mattermost.local"
+coturn_server_name: "turn.mattermost.local"
+
+# Authentication
+coturn_use_auth_secret: true  # Use static auth secret (recommended)
+coturn_static_auth_secret: ""  # REQUIRED: Set in vault (shared with rtcd)
+coturn_enable_long_term_credential: true
+
+# Relay configuration
+coturn_min_port: 49152
+coturn_max_port: 65535
+
+# TLS/SSL configuration
+coturn_tls_enabled: false
+coturn_cert_file: "/etc/coturn/cert.pem"
+coturn_key_file: "/etc/coturn/key.pem"
+coturn_dh_file: ""  # Optional Diffie-Hellman parameters
+
+# User database
+coturn_user_db_type: "sqlite"  # sqlite or postgresql
+coturn_user_db_path: "/var/lib/turn/turndb"
+# For PostgreSQL:
+# coturn_psql_userdb: "host=localhost dbname=coturn user=coturn password=secret"
+
+# Logging
+coturn_verbose: false
+coturn_log_file: "/var/log/turnserver.log"
+coturn_syslog: true
+
+# Security options
+coturn_fingerprint: true  # Add fingerprint to TURN messages
+coturn_lt_cred_mech: true  # Use long-term credential mechanism
+coturn_no_multicast_peers: true
+coturn_no_loopback_peers: true
+coturn_no_cli: true  # Disable telnet CLI for security
+
+# Performance tuning
+coturn_max_bps: 0  # 0 = unlimited bandwidth
+coturn_bps_capacity: 0  # 0 = unlimited
+coturn_stale_nonce: 600  # Nonce lifetime in seconds
+coturn_max_allocate_lifetime: 3600  # Maximum allocation lifetime
+
+# System configuration
+coturn_user: turnserver
+coturn_group: turnserver
+coturn_pid_file: "/var/run/turnserver.pid"
+
+# Firewall configuration (optional, auto-managed)
+coturn_configure_firewall: true

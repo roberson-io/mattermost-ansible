@@ -1,4 +1,4 @@
-.PHONY: help ci clean clean-all deploy-local deploy-local-check deploy-production deploy-production-check deploy-staging deploy-staging-check install lint lint-fix orb-create-vm-loadbalancer-rocky orb-create-vm-loadbalancer-ubuntu orb-create-vms orb-create-vms-ha-cluster-rocky orb-create-vms-ha-cluster-ubuntu orb-create-vms-rocky orb-create-vms-ubuntu orb-delete-vm-loadbalancer-rocky orb-delete-vm-loadbalancer-ubuntu orb-delete-vms orb-delete-vms-ha-cluster-rocky orb-delete-vms-ha-cluster-ubuntu orb-delete-vms-rocky orb-delete-vms-ubuntu ping-local ping-production ping-staging safety-check setup syntax-check test test-all test-certbot test-integration test-integration-check-vms test-integration-db-config test-mattermost test-mattermost-boards test-mattermost-calls test-mattermost-db-config test-mattermost-migrate-to-db test-mattermost-rocky test-nginx test-nginx-rocky test-postgresql test-postgresql-rocky test-rocky test-rtcd test-ubuntu test-unit vault-create vault-create-secure vault-decrypt vault-edit vault-encrypt vault-rekey vault-view
+.PHONY: help ci clean clean-all deploy-local deploy-local-check deploy-production deploy-production-check deploy-staging deploy-staging-check install lint lint-fix orb-create-vm-calls-offloader-rocky orb-create-vm-calls-offloader-ubuntu orb-create-vm-coturn-rocky orb-create-vm-coturn-ubuntu orb-create-vm-loadbalancer-rocky orb-create-vm-loadbalancer-ubuntu orb-create-vms orb-create-vms-ha-cluster-rocky orb-create-vms-ha-cluster-ubuntu orb-create-vms-rocky orb-create-vms-ubuntu orb-delete-vm-calls-offloader-rocky orb-delete-vm-calls-offloader-ubuntu orb-delete-vm-coturn-rocky orb-delete-vm-coturn-ubuntu orb-delete-vm-loadbalancer-rocky orb-delete-vm-loadbalancer-ubuntu orb-delete-vms orb-delete-vms-ha-cluster-rocky orb-delete-vms-ha-cluster-ubuntu orb-delete-vms-rocky orb-delete-vms-ubuntu ping-local ping-production ping-staging safety-check setup syntax-check test test-all test-certbot test-integration test-integration-check-vms test-integration-db-config test-mattermost test-mattermost-boards test-mattermost-calls test-mattermost-db-config test-mattermost-migrate-to-db test-mattermost-rocky test-nginx test-nginx-rocky test-postgresql test-postgresql-rocky test-rocky test-rtcd test-ubuntu test-unit vault-create vault-create-secure vault-decrypt vault-edit vault-encrypt vault-rekey vault-view
 
 # Default target
 .DEFAULT_GOAL := help
@@ -111,6 +111,26 @@ orb-create-vm-app%-ubuntu: ## Create Mattermost app node VM (Ubuntu) - Usage: ma
 	@echo "Creating Mattermost app$* VM (Ubuntu)..."
 	@orb create -a amd64 ubuntu mattermost$*-ubuntu || echo "mattermost$*-ubuntu may already exist"
 	@echo "✓ Mattermost app$* VM created. Add to inventory: [app$*] $(USER)@mattermost$*-ubuntu@orb"
+
+orb-create-vm-calls-offloader-rocky: ## Create calls-offloader VM (Rocky Linux 9)
+	@echo "Creating calls-offloader VM (Rocky Linux 9)..."
+	@orb create -a amd64 rocky:9 calls-offloader-rocky || echo "calls-offloader-rocky may already exist"
+	@echo "✓ calls-offloader VM created. Add to inventory: [calls_offloader] $(USER)@calls-offloader-rocky@orb"
+
+orb-create-vm-calls-offloader-ubuntu: ## Create calls-offloader VM (Ubuntu)
+	@echo "Creating calls-offloader VM (Ubuntu)..."
+	@orb create -a amd64 ubuntu calls-offloader-ubuntu || echo "calls-offloader-ubuntu may already exist"
+	@echo "✓ calls-offloader VM created. Add to inventory: [calls_offloader] $(USER)@calls-offloader-ubuntu@orb"
+
+orb-create-vm-coturn-rocky: ## Create coturn VM (Rocky Linux 9)
+	@echo "Creating coturn VM (Rocky Linux 9)..."
+	@orb create -a amd64 rocky:9 coturn-rocky || echo "coturn-rocky may already exist"
+	@echo "✓ coturn VM created. Add to inventory: [coturn] $(USER)@coturn-rocky@orb"
+
+orb-create-vm-coturn-ubuntu: ## Create coturn VM (Ubuntu)
+	@echo "Creating coturn VM (Ubuntu)..."
+	@orb create -a amd64 ubuntu coturn-ubuntu || echo "coturn-ubuntu may already exist"
+	@echo "✓ coturn VM created. Add to inventory: [coturn] $(USER)@coturn-ubuntu@orb"
 
 orb-create-vm-ldap%-rocky: ## Create OpenLDAP VM (Rocky Linux 9) - Usage: make orb-create-vm-ldap1-rocky
 	@echo "Creating OpenLDAP $* VM (Rocky Linux 9)..."
@@ -254,9 +274,9 @@ orb-create-vm-rtcd-ubuntu: ## Create RTCD VM (Ubuntu)
 
 orb-create-vms: orb-create-vms-rocky ## Create core OrbStack VMs (default: Rocky)
 
-orb-create-vms-all-rocky: orb-create-vms-rocky orb-create-vm-keycloak-rocky orb-create-vm-minio-rocky orb-create-vm-redis-rocky orb-create-vm-elasticsearch-rocky orb-create-vm-rtcd-rocky ## Create all Rocky VMs including optional services
+orb-create-vms-all-rocky: orb-create-vms-rocky orb-create-vm-calls-offloader-rocky orb-create-vm-coturn-rocky orb-create-vm-elasticsearch-rocky orb-create-vm-keycloak-rocky orb-create-vm-minio-rocky orb-create-vm-redis-rocky orb-create-vm-rtcd-rocky ## Create all Rocky VMs including optional services
 
-orb-create-vms-all-ubuntu: orb-create-vms-ubuntu orb-create-vm-keycloak-ubuntu orb-create-vm-minio-ubuntu orb-create-vm-redis-ubuntu orb-create-vm-elasticsearch-ubuntu orb-create-vm-rtcd-ubuntu ## Create all Ubuntu VMs including optional services
+orb-create-vms-all-ubuntu: orb-create-vms-ubuntu orb-create-vm-calls-offloader-ubuntu orb-create-vm-coturn-ubuntu orb-create-vm-elasticsearch-ubuntu orb-create-vm-keycloak-ubuntu orb-create-vm-minio-ubuntu orb-create-vm-redis-ubuntu orb-create-vm-rtcd-ubuntu ## Create all Ubuntu VMs including optional services
 
 orb-create-vms-rocky: ## Create core Rocky Linux 9 AMD64 VMs (postgresql, mattermost only)
 	@echo "Creating core Rocky Linux 9 AMD64 VMs..."
@@ -289,6 +309,22 @@ orb-create-vms-ubuntu: ## Create core Ubuntu AMD64 VMs (postgresql, mattermost o
 	@echo "Optional services:"
 	@echo "  make orb-create-vm-keycloak-ubuntu orb-create-vm-minio-ubuntu orb-create-vm-redis-ubuntu orb-create-vm-elasticsearch-ubuntu orb-create-vm-rtcd-ubuntu"
 	@echo "  make orb-create-vm-ldap1-ubuntu orb-create-vm-ldap2-ubuntu ..."
+
+orb-delete-vm-calls-offloader-rocky: ## Delete calls-offloader VM (Rocky)
+	@orb delete -f calls-offloader-rocky 2>/dev/null || true
+	@echo "✓ calls-offloader VM deleted"
+
+orb-delete-vm-calls-offloader-ubuntu: ## Delete calls-offloader VM (Ubuntu)
+	@orb delete -f calls-offloader-ubuntu 2>/dev/null || true
+	@echo "✓ calls-offloader VM deleted"
+
+orb-delete-vm-coturn-rocky: ## Delete coturn VM (Rocky)
+	@orb delete -f coturn-rocky 2>/dev/null || true
+	@echo "✓ coturn VM deleted"
+
+orb-delete-vm-coturn-ubuntu: ## Delete coturn VM (Ubuntu)
+	@orb delete -f coturn-ubuntu 2>/dev/null || true
+	@echo "✓ coturn VM deleted"
 
 orb-delete-vm-elasticsearch-rocky: ## Delete Elasticsearch VM (Rocky)
 	@orb delete -f elasticsearch-rocky 2>/dev/null || true
@@ -394,9 +430,9 @@ orb-delete-vm-rtcd-ubuntu: ## Delete RTCD VM (Ubuntu)
 
 orb-delete-vms: orb-delete-vms-rocky ## Delete core OrbStack VMs (default: Rocky)
 
-orb-delete-vms-all-rocky: orb-delete-vms-rocky orb-delete-vm-elasticsearch-rocky orb-delete-vm-keycloak-rocky orb-delete-vm-minio-rocky orb-delete-vm-redis-rocky orb-delete-vm-rtcd-rocky ## Delete all Rocky VMs including optional services
+orb-delete-vms-all-rocky: orb-delete-vms-rocky orb-delete-vm-calls-offloader-rocky orb-delete-vm-coturn-rocky orb-delete-vm-elasticsearch-rocky orb-delete-vm-keycloak-rocky orb-delete-vm-minio-rocky orb-delete-vm-redis-rocky orb-delete-vm-rtcd-rocky ## Delete all Rocky VMs including optional services
 
-orb-delete-vms-all-ubuntu: orb-delete-vms-ubuntu orb-delete-vm-elasticsearch-ubuntu orb-delete-vm-keycloak-ubuntu orb-delete-vm-minio-ubuntu orb-delete-vm-redis-ubuntu orb-delete-vm-rtcd-ubuntu ## Delete all Ubuntu VMs including optional services
+orb-delete-vms-all-ubuntu: orb-delete-vms-ubuntu orb-delete-vm-calls-offloader-ubuntu orb-delete-vm-coturn-ubuntu orb-delete-vm-elasticsearch-ubuntu orb-delete-vm-keycloak-ubuntu orb-delete-vm-minio-ubuntu orb-delete-vm-redis-ubuntu orb-delete-vm-rtcd-ubuntu ## Delete all Ubuntu VMs including optional services
 
 orb-delete-vms-rocky: ## Delete core Rocky Linux VMs
 	@echo "Deleting core Rocky Linux VMs..."

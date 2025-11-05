@@ -1,0 +1,5 @@
+---
+# RedHat/Rocky specific variables
+
+coturn_service_name: coturn
+coturn_config_path: /etc/turnserver.conf

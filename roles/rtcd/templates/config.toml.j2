@@ -38,20 +38,18 @@ ice_host_override = "{{ rtcd_ice_host_override }}"
 {% endif %}
 
 {% if rtcd_ice_servers %}
-[[rtc.ice_servers]]
-{% for server in rtcd_ice_servers %}
-urls = {{ server.urls | to_json }}
-{% if server.username is defined %}
-username = "{{ server.username }}"
-{% endif %}
-{% if server.credential is defined %}
-credential = "{{ server.credential }}"
-{% endif %}
-{% if not loop.last %}
+ice_servers = [
+{%- for server in rtcd_ice_servers %}
+    {urls = {{ server.urls | to_json }}{% if server.username is defined %}, username = "{{ server.username }}"{% endif %}{% if server.credential is defined %}, credential = "{{ server.credential }}"{% endif %}}{% if not loop.last %},{% endif %}
 
-[[rtc.ice_servers]]
+{%- endfor %}
+]
 {% endif %}
-{% endfor %}
+
+{% if rtcd_turn_static_auth_secret | length > 0 %}
+[rtc.turn]
+static_auth_secret = "{{ rtcd_turn_static_auth_secret }}"
+credentials_expiration_minutes = {{ rtcd_turn_credentials_expiration_minutes }}
 {% endif %}
 
 [store]

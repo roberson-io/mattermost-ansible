@@ -1,0 +1,21 @@
+[Unit]
+Description=Mattermost Calls Offloader
+Documentation=https://github.com/mattermost/calls-offloader
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User={{ calls_offloader_user }}
+Group={{ calls_offloader_group }}
+ExecStart={{ calls_offloader_install_dir }}/calls-offloader --config {{ calls_offloader_config_dir }}/config.toml
+Restart=always
+RestartSec=10
+LimitNOFILE=65536
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

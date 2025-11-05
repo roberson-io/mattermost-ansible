@@ -71,6 +71,19 @@ certbot_create_if_missing: true
 # rtcd_ice_port_udp: 8443
 # rtcd_ice_port_tcp: 8443
 
+# TURN Server (coturn) - Optional, for restrictive firewall environments
+# Uncomment if clients cannot connect via UDP due to firewall restrictions
+# enable_coturn: true
+# coturn_static_auth_secret: "{{ vault_production_turn_static_auth_secret }}"
+# rtcd_turn_static_auth_secret: "{{ vault_production_turn_static_auth_secret }}"
+# rtcd_turn_credentials_expiration_minutes: 1440  # 24 hours
+
+# Call Recording/Transcription - Optional, requires calls-offloader + Docker
+# mattermost_calls_enable_recording: true
+# mattermost_calls_job_service_url: "http://{{ hostvars[groups['calls_offloader'][0]]['ansible_default_ipv4']['address'] }}:4545"
+# calls_offloader_max_concurrent_jobs: 8
+# calls_offloader_failed_jobs_retention_time: "30d"
+
 # Mattermost Boards configuration (optional)
 # Enable Boards plugin for project management features
 # mattermost_enable_boards: true

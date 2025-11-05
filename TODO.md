@@ -110,52 +110,66 @@ This document tracks the implementation of enterprise-scale features for the Mat
 
 ## Phase 3: Advanced Calls Features
 
+> **Architecture Note**: The calls-offloader runs as a native Go binary (systemd service) and requires Docker API access to spawn recorder/transcriber jobs on-demand. The recorder and transcriber are Docker containers managed by the offloader - they are NOT deployed as separate services.
+>
+> **TURN Server Note**: TURN (Traversal Using Relays around NAT) is needed as a fallback when clients cannot connect through UDP due to restrictive firewalls. Mattermost officially recommends [coturn](https://github.com/coturn/coturn) for TURN services. TURN should be avoided when possible due to increased latency, but is essential for corporate networks that block direct UDP connections.
+
+### TURN Server (coturn) - Optional
+- [x] Review [Mattermost Calls deployment documentation](https://docs.mattermost.com/administration-guide/configure/calls-deployment.html) for TURN requirements
+- [x] Review [coturn configuration example](https://github.com/mattermost/mattermost-webrtc/blob/master/vagrant/coturn/turnserver.conf)
+- [x] Create `roles/coturn/` directory structure
+- [x] Implement coturn installation (from package repos)
+- [x] Create coturn configuration template (`turnserver.conf`) with all required settings
+- [x] Add systemd service management
+- [x] Configure firewall rules (ports 3478, 5349, and relay port range)
+- [x] Add coturn variables to defaults (all standard coturn settings)
+- [x] Document when TURN is needed vs optional (in README)
+- [ ] Create Molecule tests for coturn role
+
 ### Docker Prerequisites
-- [ ] Create `roles/docker/` if not exists
-- [ ] Implement Docker engine installation
-- [ ] Configure Docker daemon
-- [ ] Add Docker user/group management
+- [x] Review [calls-offloader documentation](https://github.com/mattermost/calls-offloader/blob/master/docs/getting_started.md) for Docker requirements
+- [x] Create `roles/docker/` directory structure
+- [x] Implement Docker Engine installation (latest stable)
+- [x] Configure Docker daemon settings
+- [x] Add Docker group management for service users
+- [ ] Create Molecule tests for docker role
 
 ### Calls Offloader Service
-- [ ] Create `roles/calls-offloader/` directory structure
-- [ ] Implement Go build process from source
-- [ ] Create TOML configuration template
-- [ ] Add systemd service management
-- [ ] Configure integration with RTCD
-- [ ] Add job queue configuration
-- [ ] Add firewall rules
+- [x] Create `roles/calls-offloader/` directory structure
+- [x] Implement binary download from GitHub releases
+- [x] Create TOML configuration template (verified settings from config.sample.toml)
+- [x] Create systemd service unit file
+- [x] Add user to docker group in service setup
+- [x] Add calls-offloader service management tasks
+- [x] Add variables to role defaults (verified from config.sample.toml)
 - [ ] Create Molecule tests for calls-offloader role
 
-### Calls Recorder Integration
-- [ ] Create `roles/calls-recorder/` directory structure
-- [ ] Implement Docker container deployment
-- [ ] Create environment variable configuration
-- [ ] Add Docker Compose file or systemd unit for container
-- [ ] Configure bot user credentials
-- [ ] Integrate with calls-offloader
-- [ ] Add Molecule tests for calls-recorder role
-
-### Calls Transcriber Integration
-- [ ] Create `roles/calls-transcriber/` directory structure
-- [ ] Implement Docker container deployment
-- [ ] Create environment variable configuration
-- [ ] Add Docker Compose file or systemd unit for container
-- [ ] Configure transcription service settings
-- [ ] Integrate with calls-offloader
-- [ ] Add Molecule tests for calls-transcriber role
+### RTCD TURN Integration
+- [x] Add TURN static auth secret variables to `roles/rtcd/defaults/main.yml` (verified from config.sample.toml)
+- [x] Update rtcd configuration template to include TURN settings in `[rtc.turn]` section
+- [x] Add logic to automatically configure ICE servers when coturn is deployed
+- [ ] Document TURN static auth secret sharing between rtcd and coturn
 
 ### Mattermost Calls Plugin Configuration
-- [ ] Extend Calls plugin configuration variables
-- [ ] Add recording bot credentials configuration
-- [ ] Add transcription service URL configuration
-- [ ] Add offloader service URL configuration
-- [ ] Implement configuration via mmctl
-- [ ] Update existing RTCD configuration for offloader integration
+- [x] Add basic Calls plugin configuration variables (verified from plugin source)
+- [x] Configure rtcdserviceurl via mmctl
+- [x] Configure enablerecordings via mmctl
+- [x] Configure jobserviceurl via mmctl
+- [x] Add auto-configuration logic for ICE servers from coturn deployment
+- [ ] Document Enterprise license requirement for recordings/transcriptions
 
 ### Infrastructure
-- [ ] Add `[calls-offloader]` host group to inventories
-- [ ] Update Makefile with Calls VM targets
-- [ ] Write `docs/calls-advanced.md` documentation
+- [x] Add `[coturn]` host group to inventory examples
+- [x] Add `[calls_offloader]` host group to inventory examples
+- [x] Update Makefile with coturn and calls-offloader VM targets
+- [x] Update group_vars examples with coturn and calls-offloader configuration
+- [x] Add coturn and calls-offloader plays to site.yml
+- [ ] Write `docs/calls-advanced.md` documentation covering:
+  - [ ] Architecture overview (RTCD, coturn, offloader + Docker containers)
+  - [ ] When TURN is needed vs optional
+  - [ ] Docker requirements and network configuration
+  - [ ] TURN static auth secret configuration
+  - [ ] Troubleshooting Docker and TURN connectivity issues
 
 ---
 

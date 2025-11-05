@@ -64,6 +64,16 @@ YOUR_USER@YOUR_APP_HOST
 # Example: your_user@rtcd@orb
 # YOUR_USER@YOUR_RTCD_HOST
 
+[coturn]
+# Optional: TURN server for Mattermost Calls (needed for restrictive firewalls)
+# Example: your_user@coturn@orb
+# YOUR_USER@YOUR_COTURN_HOST
+
+[calls_offloader]
+# Optional: Call recording/transcription service (requires Docker)
+# Example: your_user@calls-offloader@orb
+# YOUR_USER@YOUR_CALLS_OFFLOADER_HOST
+
 [minio]
 # Optional for single-node, REQUIRED for HA cluster (shared file storage)
 # Example: your_user@minio@orb
@@ -124,6 +134,8 @@ database
 app
 loadbalancer
 rtcd
+coturn
+calls_offloader
 minio
 redis
 elasticsearch

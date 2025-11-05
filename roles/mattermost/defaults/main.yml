@@ -88,3 +88,33 @@ mattermost_cluster_read_only_config: true  # Make config.json read-only (recomme
 mattermost_configure_system_limits: false  # Set to true to configure system limits for HA
 mattermost_max_open_files: 65536  # Maximum open files (ulimit -n)
 mattermost_max_processes: 8192  # Maximum processes (ulimit -u)
+
+# Calls plugin configuration (optional)
+mattermost_enable_calls: false  # Set to true to enable Calls plugin
+mattermost_calls_rtcd_url: ""  # RTCD service URL (e.g., http://rtcd-host:8045)
+
+# Recording settings
+mattermost_calls_enable_recording: false  # Enable call recording
+mattermost_calls_job_service_url: ""  # calls-offloader URL (e.g., http://calls-offloader:4545)
+mattermost_calls_recording_quality: "medium"  # Recording quality: low, medium, high
+mattermost_calls_max_recording_duration: 60  # Max recording duration in minutes (0 = unlimited)
+
+# Transcription settings
+mattermost_calls_enable_transcriptions: false  # Enable call transcriptions
+mattermost_calls_transcriber_model_size: "base"  # Model size: tiny, base, small, medium
+mattermost_calls_transcriber_num_threads: 2  # Number of threads for transcription
+mattermost_calls_transcribe_api: "whisper.cpp"  # API: whisper.cpp, azure
+mattermost_calls_enable_live_captions: false  # Enable live captions during calls
+mattermost_calls_live_captions_model_size: "tiny"  # Live captions model: tiny, base, small
+mattermost_calls_live_captions_language: "en"  # Language code for live captions
+
+# TURN/ICE settings (when not using RTCD)
+mattermost_calls_ice_host_override: ""  # Override ICE host candidate IP/hostname
+mattermost_calls_udp_server_port: 8443  # UDP port for RTC server
+mattermost_calls_tcp_server_port: 8443  # TCP port for RTC server
+mattermost_calls_enable_ipv6: false  # Enable dual-stack IPv6
+
+# Other settings
+mattermost_calls_enable_ringing: true  # Enable ringing for DM/GM calls
+mattermost_calls_max_call_participants: 0  # Max participants per call (0 = unlimited)
+mattermost_calls_allow_screen_sharing: true  # Allow screen sharing in calls

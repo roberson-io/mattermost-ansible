@@ -39,6 +39,10 @@ rtcd_ice_servers: []
 #     username: "turnuser"
 #     credential: "turnpass"
 
+# TURN Static Auth Configuration (for coturn integration)
+rtcd_turn_static_auth_secret: ""  # Must match coturn_static_auth_secret
+rtcd_turn_credentials_expiration_minutes: 1440  # 24 hours
+
 # Logger Configuration
 rtcd_logger_enable_console: true
 rtcd_logger_console_level: "INFO"

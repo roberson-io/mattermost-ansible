@@ -1,0 +1,11 @@
+---
+# calls-offloader role handlers
+
+- name: reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: restart calls-offloader
+  ansible.builtin.systemd:
+    name: calls-offloader
+    state: restarted
