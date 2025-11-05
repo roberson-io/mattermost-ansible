@@ -213,7 +213,7 @@
 # System limits configuration for HA cluster (optional)
 #
 - name: Configure system limits for Mattermost user (max open files)
-  ansible.builtin.pam_limits:
+  community.general.pam_limits:
     domain: mattermost
     limit_type: "{{ item }}"
     limit_item: nofile
@@ -224,7 +224,7 @@
   when: mattermost_configure_system_limits | default(false)
 
 - name: Configure system limits for Mattermost user (max processes)
-  ansible.builtin.pam_limits:
+  community.general.pam_limits:
     domain: mattermost
     limit_type: "{{ item }}"
     limit_item: nproc

@@ -37,7 +37,7 @@ moduleload back_{{ openldap_database_type }}.la
 database {{ openldap_database_type }}
 suffix "{{ openldap_base_dn }}"
 rootdn "cn={{ openldap_admin_cn }},{{ openldap_base_dn }}"
-rootpw {{ slapd_password_hash.stdout }}
+rootpw {{ openldap_slapd_password_hash.stdout }}
 
 # Database directory
 directory {{ openldap_data_dir }}

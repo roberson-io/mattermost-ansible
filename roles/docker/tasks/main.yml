@@ -17,7 +17,7 @@
   when: ansible_os_family == "Debian"
 
 - name: Install prerequisites (RedHat/Rocky)
-  ansible.builtin.yum:
+  ansible.builtin.dnf:
     name:
       - yum-utils
       - device-mapper-persistent-data
@@ -54,14 +54,14 @@
     state: present
     update_cache: true
   when: ansible_os_family == "Debian"
-  notify: restart docker
+  notify: Restart docker
 
 - name: Install Docker packages (RedHat/Rocky)
-  ansible.builtin.yum:
+  ansible.builtin.dnf:
     name: "{{ docker_packages }}"
     state: present
   when: ansible_os_family == "RedHat"
-  notify: restart docker
+  notify: Restart docker
 
 - name: Create Docker configuration directory
   ansible.builtin.file:

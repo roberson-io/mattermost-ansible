@@ -1,7 +1,7 @@
 ---
 # Elasticsearch handlers
 
-- name: restart elasticsearch
+- name: Restart elasticsearch
   ansible.builtin.systemd:
     name: elasticsearch
     state: restarted

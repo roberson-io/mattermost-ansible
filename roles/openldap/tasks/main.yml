@@ -33,18 +33,20 @@
 - name: Check if OpenLDAP is already installed
   ansible.builtin.stat:
     path: "{{ openldap_install_path }}/libexec/slapd"
-  register: slapd_binary
+  register: openldap_slapd_binary
 
 - name: Get installed OpenLDAP version
   ansible.builtin.command: "{{ openldap_install_path }}/libexec/slapd -VV"
-  register: installed_version
+  register: openldap_installed_version
   changed_when: false
   failed_when: false
-  when: slapd_binary.stat.exists
+  when: openldap_slapd_binary.stat.exists
 
 - name: Set version facts
   ansible.builtin.set_fact:
-    openldap_needs_install: "{{ not slapd_binary.stat.exists or (installed_version.stdout is defined and openldap_version not in installed_version.stdout) }}"
+    openldap_needs_install: >-
+      {{ not openldap_slapd_binary.stat.exists or
+      (openldap_installed_version.stdout is defined and openldap_version not in openldap_installed_version.stdout) }}
 
 - name: Download OpenLDAP source
   ansible.builtin.get_url:
@@ -66,8 +68,8 @@
     state: stopped
   when:
     - openldap_needs_install
-    - slapd_binary.stat.exists
-  ignore_errors: true
+    - openldap_slapd_binary.stat.exists
+  failed_when: false
 
 - name: Configure OpenLDAP build
   ansible.builtin.command:
@@ -125,13 +127,13 @@
 
 - name: Generate slapd password hash
   ansible.builtin.command: "{{ openldap_install_path }}/sbin/slappasswd -s {{ openldap_admin_password }}"
-  register: slapd_password_hash
+  register: openldap_slapd_password_hash
   changed_when: false
   no_log: true
 
 - name: Generate config password hash
   ansible.builtin.command: "{{ openldap_install_path }}/sbin/slappasswd -s {{ openldap_config_password }}"
-  register: config_password_hash
+  register: openldap_config_password_hash
   changed_when: false
   no_log: true
 
@@ -155,7 +157,7 @@
 - name: Check if database has been initialized
   ansible.builtin.stat:
     path: "{{ openldap_data_dir }}/data.mdb"
-  register: db_initialized
+  register: openldap_db_initialized
 
 - name: Copy DB_CONFIG template
   ansible.builtin.copy:
@@ -164,19 +166,21 @@
     owner: "{{ openldap_user }}"
     group: "{{ openldap_group }}"
     mode: '0640'
-  when: not db_initialized.stat.exists
+  when: not openldap_db_initialized.stat.exists
 
 - name: Initialize OpenLDAP database with base DN
   ansible.builtin.command: >
     {{ openldap_install_path }}/sbin/slapadd
     -l /tmp/base-{{ openldap_instance_name }}.ldif
     -f {{ openldap_config_dir }}/slapd-{{ openldap_instance_name }}.conf
+  become: true
   become_user: "{{ openldap_user }}"
-  when: not db_initialized.stat.exists
-  register: slapadd_result
+  when: not openldap_db_initialized.stat.exists
+  changed_when: true
+  register: openldap_slapadd_result
   failed_when:
-    - slapadd_result.rc != 0
-    - "'already exists' not in slapadd_result.stderr"
+    - openldap_slapadd_result.rc != 0
+    - "'already exists' not in openldap_slapadd_result.stderr"
 
 - name: Set correct permissions on database directory
   ansible.builtin.file:

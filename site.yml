@@ -83,6 +83,9 @@
       changed_when: false
 
     - name: Validate NTP time synchronization for HA cluster
+      when:
+        - mattermost_enable_cluster | default(false)
+        - groups.app | default([]) | length > 1
       block:
         - name: Check if chronyd is running (RedHat/Rocky)
           ansible.builtin.systemd:
@@ -104,9 +107,6 @@
           when: >
             (ansible_os_family == "RedHat" and (chronyd_status.status.ActiveState | default('inactive')) != 'active') or
             (ansible_os_family == "Debian" and (timesyncd_status.status.ActiveState | default('inactive')) != 'active')
-      when:
-        - mattermost_enable_cluster | default(false)
-        - groups.app | default([]) | length > 1
 
     - name: Gather facts from database host
       ansible.builtin.setup:

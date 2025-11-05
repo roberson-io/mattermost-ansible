@@ -16,7 +16,7 @@
 
 - name: Check installed Redis version
   ansible.builtin.command: "{{ redis_install_path }}/bin/redis-server --version"
-  register: installed_version
+  register: redis_installed_version
   changed_when: false
   failed_when: false
   when: redis_binary.stat.exists
@@ -25,7 +25,7 @@
   ansible.builtin.set_fact:
     redis_needs_install: >-
       {{ not redis_binary.stat.exists or
-         redis_version not in installed_version.stdout | default('') }}
+         redis_version not in redis_installed_version.stdout | default('') }}
 
 - name: Download Redis source
   ansible.builtin.get_url:
@@ -46,12 +46,14 @@
     cmd: make USE_SYSTEMD=yes
     chdir: "/tmp/redis-{{ redis_version }}"
   when: redis_needs_install
+  changed_when: true
 
 - name: Install Redis binaries
   ansible.builtin.command:
     cmd: make PREFIX={{ redis_install_path }} install
     chdir: "/tmp/redis-{{ redis_version }}"
   when: redis_needs_install
+  changed_when: true
 
 - name: Clean up Redis source files
   ansible.builtin.file:
@@ -107,11 +109,11 @@
     - name: Check if firewalld is available
       ansible.builtin.systemd:
         name: firewalld
-      register: firewalld_service
+      register: redis_firewalld_service
       failed_when: false
 
     - name: Configure firewalld for Redis
-      when: firewalld_service.status.ActiveState == "active"
+      when: redis_firewalld_service.status.ActiveState == "active"
       block:
         - name: Open Redis port in firewalld (temporary)
           ansible.posix.firewalld:

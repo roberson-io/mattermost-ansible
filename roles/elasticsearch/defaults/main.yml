@@ -62,5 +62,7 @@ elasticsearch_firewall_allowed_sources: []  # List of IP addresses or CIDR range
 
 # OpenSearch alternative (set to true to install OpenSearch instead of Elasticsearch)
 elasticsearch_use_opensearch: false
-opensearch_version: "2.18.0"
-opensearch_download_url: "https://artifacts.opensearch.org/releases/bundle/opensearch/{{ opensearch_version }}/opensearch-{{ opensearch_version }}-linux-x64.tar.gz"
+elasticsearch_opensearch_version: "2.18.0"
+elasticsearch_opensearch_download_url: >-
+  https://artifacts.opensearch.org/releases/bundle/opensearch/{{ elasticsearch_opensearch_version }}/
+  opensearch-{{ elasticsearch_opensearch_version }}-linux-x64.tar.gz

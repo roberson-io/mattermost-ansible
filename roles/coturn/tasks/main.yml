@@ -93,7 +93,7 @@
 - name: Check if firewalld is available (RedHat)
   ansible.builtin.systemd:
     name: firewalld
-  register: firewalld_status
+  register: coturn_firewalld_status
   failed_when: false
   when:
     - ansible_os_family == "RedHat"
@@ -112,7 +112,7 @@
   when:
     - ansible_os_family == "RedHat"
     - coturn_configure_firewall | bool
-    - firewalld_status.status.ActiveState == "active"
+    - coturn_firewalld_status.status.ActiveState == "active"
   tags: coturn
 
 - name: Allow TURNS port through firewall (firewalld - RedHat)
@@ -140,12 +140,12 @@
   when:
     - ansible_os_family == "RedHat"
     - coturn_configure_firewall | bool
-    - firewalld_status.status.ActiveState == "active"
+    - coturn_firewalld_status.status.ActiveState == "active"
   tags: coturn
 
 - name: Check if ufw is available (Debian/Ubuntu)
   ansible.builtin.command: which ufw
-  register: ufw_check
+  register: coturn_ufw_check
   failed_when: false
   changed_when: false
   when:
@@ -164,7 +164,7 @@
   when:
     - ansible_os_family == "Debian"
     - coturn_configure_firewall | bool
-    - ufw_check.rc == 0
+    - coturn_ufw_check.rc == 0
   tags: coturn
 
 - name: Allow TURNS port through firewall (ufw - Debian/Ubuntu)
@@ -176,7 +176,7 @@
     - ansible_os_family == "Debian"
     - coturn_configure_firewall | bool
     - coturn_tls_enabled | bool
-    - ufw_check.rc == 0
+    - coturn_ufw_check.rc == 0
   tags: coturn
 
 - name: Allow relay port range through firewall (ufw - Debian/Ubuntu)
@@ -190,7 +190,7 @@
   when:
     - ansible_os_family == "Debian"
     - coturn_configure_firewall | bool
-    - ufw_check.rc == 0
+    - coturn_ufw_check.rc == 0
   tags: coturn
 
 - name: Enable and start coturn service

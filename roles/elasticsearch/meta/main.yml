@@ -1,9 +1,9 @@
 ---
 galaxy_info:
   role_name: elasticsearch
-  author: Mattermost Ansible
+  author: Mattermost
   description: Install and configure Elasticsearch or OpenSearch for Mattermost
-  license: MIT
+  license: ""
   min_ansible_version: "2.15"
 
   platforms:

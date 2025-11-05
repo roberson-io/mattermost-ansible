@@ -122,7 +122,9 @@
 
 - name: Build discovery seed hosts list
   ansible.builtin.set_fact:
-    elasticsearch_discovery_seed_hosts: "{{ groups.elasticsearch | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | map('regex_replace', '^(.*)$', '\\1:' ~ elasticsearch_transport_port) | list }}"
+    elasticsearch_discovery_seed_hosts: >-
+      {{ groups.elasticsearch | map('extract', hostvars, ['ansible_default_ipv4', 'address']) |
+      map('regex_replace', '^(.*)$', '\\1:' ~ elasticsearch_transport_port) | list }}
   when:
     - elasticsearch_cluster_mode == "multi"
     - elasticsearch_discovery_seed_hosts | length == 0
@@ -161,13 +163,14 @@
   block:
     - name: Check if ICU plugin is already installed
       ansible.builtin.command: "{{ elasticsearch_install_path }}/bin/elasticsearch-plugin list"
-      register: installed_plugins
+      register: elasticsearch_installed_plugins
       changed_when: false
       failed_when: false
 
     - name: Install ICU Analysis plugin
       ansible.builtin.command: "{{ elasticsearch_install_path }}/bin/elasticsearch-plugin install analysis-icu --batch"
-      when: "'analysis-icu' not in installed_plugins.stdout"
+      when: "'analysis-icu' not in elasticsearch_installed_plugins.stdout"
+      changed_when: true
       notify: restart elasticsearch
 
 - name: Configure firewall for Elasticsearch
@@ -176,11 +179,11 @@
     - name: Check if firewalld is available
       ansible.builtin.systemd:
         name: firewalld
-      register: firewalld_service
+      register: elasticsearch_firewalld_service
       failed_when: false
 
     - name: Configure firewalld for Elasticsearch
-      when: firewalld_service.status.ActiveState == "active"
+      when: elasticsearch_firewalld_service.status.ActiveState == "active"
       block:
         - name: Open Elasticsearch HTTP port in firewalld (temporary)
           ansible.posix.firewalld:
@@ -305,7 +308,7 @@
     password: "{{ elasticsearch_password if elasticsearch_enable_security == 'true' else omit }}"
     force_basic_auth: "{{ elasticsearch_enable_security == 'true' }}"
     status_code: 200
-  register: es_health_check
+  register: elasticsearch_health_check
   retries: 5
   delay: 10
-  until: es_health_check is succeeded
+  until: elasticsearch_health_check is succeeded

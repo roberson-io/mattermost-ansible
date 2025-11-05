@@ -37,7 +37,10 @@
 
 - name: Get installed Keycloak version
   ansible.builtin.shell: |
+    set -o pipefail
     {{ keycloak_install_path }}/bin/kc.sh --version | grep -oP 'Keycloak \K[0-9.]+'
+  args:
+    executable: /bin/bash
   register: keycloak_current_version
   changed_when: false
   failed_when: false
