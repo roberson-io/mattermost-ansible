@@ -35,21 +35,13 @@ clean-all: clean ## Clean everything including venv
 	@rm -rf venv
 	@echo "✓ Full cleanup complete"
 
-deploy-local: ## Deploy to local VMs (inventory/local.ini)
+deploy-local: ## Deploy to local VMs (single-node or HA cluster via inventory/local.ini)
 	@echo "Deploying to local environment..."
 	@$(VENV_ACTIVATE) && ansible-playbook -i inventory/local.ini site.yml $(VAULT_PASS_ARG)
 
-deploy-local-check: ## Dry-run deploy to local VMs
+deploy-local-check: ## Dry-run deploy to local VMs (single-node or HA)
 	@echo "Checking local deployment (dry-run)..."
 	@$(VENV_ACTIVATE) && ansible-playbook -i inventory/local.ini site.yml --check --diff $(VAULT_PASS_ARG)
-
-deploy-local-ha: ## Deploy to local HA cluster (inventory/local-ha.ini)
-	@echo "Deploying to local HA cluster environment..."
-	@$(VENV_ACTIVATE) && ansible-playbook -i inventory/local-ha.ini site.yml $(VAULT_PASS_ARG)
-
-deploy-local-ha-check: ## Dry-run deploy to local HA cluster
-	@echo "Checking local HA cluster deployment (dry-run)..."
-	@$(VENV_ACTIVATE) && ansible-playbook -i inventory/local-ha.ini site.yml --check --diff $(VAULT_PASS_ARG)
 
 deploy-production: ## Deploy to production (inventory/production.ini)
 	@echo "Deploying to production environment..."

@@ -25,8 +25,15 @@ YOUR_USER@YOUR_DB_HOST
 # Example: your_user@mattermost@orb
 YOUR_USER@YOUR_APP_HOST
 
-# Multi-node Mattermost HA cluster (requires loadbalancer, MinIO, Redis, database config):
-# Uncomment and configure multiple app instances for HA cluster
+# Multi-node Mattermost HA cluster:
+# REQUIREMENTS for HA cluster:
+#   - 2+ app nodes (using [app:children] pattern below)
+#   - Load balancer (nginx) - REQUIRED
+#   - MinIO or S3 storage - REQUIRED for shared file storage
+#   - Database config storage - REQUIRED (set mattermost_config_storage: "database")
+#   - Enterprise license - REQUIRED (Free edition doesn't support clustering)
+#   - Redis - Optional, recommended for 100,000+ users
+#   - Elasticsearch - Optional, recommended for 2.5M+ posts
 # Number of nodes depends on your reference architecture (see Mattermost scaling docs)
 # [app1]
 # Example: your_user@mattermost1@orb
@@ -58,7 +65,7 @@ YOUR_USER@YOUR_APP_HOST
 # YOUR_USER@YOUR_RTCD_HOST
 
 [minio]
-# Optional: Enable MinIO object storage by uncommenting and configuring
+# Optional for single-node, REQUIRED for HA cluster (shared file storage)
 # Example: your_user@minio@orb
 # YOUR_USER@YOUR_MINIO_HOST
 

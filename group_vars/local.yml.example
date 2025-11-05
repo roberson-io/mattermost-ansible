@@ -97,6 +97,42 @@ mattermost_boards_version: "9.2.0"
 # mattermost_elasticsearch_username: "elastic"
 # mattermost_elasticsearch_password: "{{ vault_local_elasticsearch_password }}"
 
-# No nginx/TLS for local development
+# nginx/TLS configuration
+# For single-node: typically use_nginx: false (access Mattermost directly on port 8065)
+# For HA cluster: set use_nginx based on whether loadbalancer is in inventory
 use_nginx: false
 use_tls: false
+
+# High Availability (HA) cluster configuration
+# Enable these settings when deploying a multi-node HA cluster
+# See inventory file for HA cluster requirements
+
+# HA Cluster - Uncomment to enable clustering
+# mattermost_enable_cluster: true
+# mattermost_cluster_name: "local-ha"
+# mattermost_cluster_use_ip_address: true  # Use IP addresses for node discovery
+# mattermost_gossip_port: 8074  # Port for cluster gossip protocol
+# mattermost_cluster_read_only_config: true  # Prevent config changes via UI in cluster
+
+# PostgreSQL HA Performance Tuning (for HA deployments)
+# Scaled for local VMs - adjust based on your VM resources
+# postgresql_max_connections: 200  # Lower than production (1024)
+# postgresql_shared_buffers: "256MB"  # Adjust based on VM RAM
+# postgresql_effective_cache_size: "1GB"  # ~65% of available RAM
+# postgresql_work_mem: "4MB"  # Per-operation memory
+# postgresql_maintenance_work_mem: "128MB"  # For maintenance operations
+# postgresql_random_page_cost: 1.1  # Optimized for SSD storage
+# postgresql_autovacuum_max_workers: 3
+# postgresql_max_worker_processes: 8
+# postgresql_wal_level: "replica"  # Enable replication support
+# postgresql_max_wal_senders: 10
+# postgresql_wal_keep_size: "1GB"
+# postgresql_hot_standby: "on"
+# postgresql_hot_standby_feedback: "on"
+
+# Load Balancer (nginx) configuration for HA cluster
+# nginx_ssl_enabled: false  # Disable SSL for local testing
+# nginx_lb_algorithm: "ip_hash"  # Sticky sessions for WebSockets
+# nginx_max_fails: 3
+# nginx_fail_timeout: 30
+# nginx_server_name: "mattermost-ha.local"
