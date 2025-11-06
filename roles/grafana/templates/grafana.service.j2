@@ -1,0 +1,28 @@
+[Unit]
+Description=Grafana
+Documentation=https://grafana.com/docs/
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User={{ grafana_user }}
+Group={{ grafana_group }}
+WorkingDirectory={{ grafana_install_path }}
+ExecStart={{ grafana_install_path }}/bin/grafana-server \
+  --config={{ grafana_config_file }} \
+  --pidfile=/var/run/grafana/grafana-server.pid \
+  --packaging=tar \
+  cfg:default.paths.logs={{ grafana_logs_dir }} \
+  cfg:default.paths.data={{ grafana_data_dir }} \
+  cfg:default.paths.plugins={{ grafana_plugins_dir }} \
+  cfg:default.paths.provisioning={{ grafana_provisioning_dir }}
+
+SyslogIdentifier=grafana
+Restart=always
+RestartSec=5
+RuntimeDirectory=grafana
+RuntimeDirectoryMode=0755
+
+[Install]
+WantedBy=multi-user.target

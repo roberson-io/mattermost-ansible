@@ -1,0 +1,15 @@
+# Dashboard provisioning configuration
+# Managed by Ansible
+
+apiVersion: 1
+
+providers:
+  - name: 'Mattermost Dashboards'
+    orgId: 1
+    folder: 'Mattermost'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: {{ grafana_dashboards_path }}

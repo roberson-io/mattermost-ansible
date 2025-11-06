@@ -1,0 +1,24 @@
+# Prometheus data source provisioning
+# Managed by Ansible
+
+apiVersion: 1
+
+datasources:
+  - name: {{ grafana_prometheus_datasource_name }}
+    type: prometheus
+    access: proxy
+    url: {{ grafana_prometheus_url }}
+    uid: DS_PROMETHEUS
+    isDefault: true
+    editable: true
+    jsonData:
+      timeInterval: 5s
+  - name: Mattermost
+    type: prometheus
+    access: proxy
+    url: {{ grafana_prometheus_url }}
+    uid: DS_MATTERMOST
+    isDefault: false
+    editable: true
+    jsonData:
+      timeInterval: 5s

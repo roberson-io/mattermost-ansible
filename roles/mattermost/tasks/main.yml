@@ -1467,3 +1467,55 @@
     state: absent
   when:
     - mattermost_enable_calls | bool
+
+# Performance monitoring configuration
+- name: Enable performance monitoring in Mattermost
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set
+      MetricsSettings.Enable true
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when:
+    - mattermost_enable_performance_monitoring | bool
+
+- name: Set performance monitoring listen address
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set
+      MetricsSettings.ListenAddress {{ mattermost_performance_monitoring_listen_address }}
+  become: true
+  become_user: mattermost
+  changed_when: true
+  when:
+    - mattermost_enable_performance_monitoring | bool
+
+- name: Configure firewall for performance monitoring (firewalld)
+  ansible.posix.firewalld:
+    port: "{{ mattermost_performance_monitoring_listen_address.split(':')[1] }}/tcp"
+    permanent: true
+    state: enabled
+    immediate: true
+    source: "{{ item }}"
+  loop: "{{ groups['monitoring'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | list }}"
+  when:
+    - mattermost_enable_performance_monitoring | bool
+    - ansible_os_family == "RedHat"
+    - groups['monitoring'] is defined
+    - groups['monitoring'] | length > 0
+  failed_when: false
+
+- name: Configure firewall for performance monitoring (ufw)
+  community.general.ufw:
+    rule: allow
+    port: "{{ mattermost_performance_monitoring_listen_address.split(':')[1] }}"
+    proto: tcp
+    from_ip: "{{ item }}"
+  loop: "{{ groups['monitoring'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | list }}"
+  when:
+    - mattermost_enable_performance_monitoring | bool
+    - ansible_os_family == "Debian"
+    - groups['monitoring'] is defined
+    - groups['monitoring'] | length > 0
+  failed_when: false

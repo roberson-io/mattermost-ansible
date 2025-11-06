@@ -1,0 +1,24 @@
+---
+galaxy_info:
+  role_name: node_exporter
+  author: Mattermost
+  description: Install and configure Node Exporter for system metrics
+  license: ""
+  min_ansible_version: "2.9"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+        - noble
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+  galaxy_tags:
+    - nodeexporter
+    - prometheus
+    - monitoring
+    - metrics
+
+dependencies: []

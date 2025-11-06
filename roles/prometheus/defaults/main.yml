@@ -1,0 +1,49 @@
+---
+# Prometheus role default variables
+
+# Prometheus version (using LTS for stability)
+prometheus_version: "3.5.0"
+prometheus_download_url: >-
+  https://github.com/prometheus/prometheus/releases/download/v{{ prometheus_version }}/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz
+
+# Installation paths
+prometheus_install_path: "/opt/prometheus"
+prometheus_config_dir: "/etc/prometheus"
+prometheus_data_dir: "/var/lib/prometheus"
+
+# System user and group
+prometheus_user: "prometheus"
+prometheus_group: "prometheus"
+prometheus_system_user: true
+
+# Service configuration
+prometheus_listen_address: "0.0.0.0:9090"
+prometheus_web_external_url: ""
+prometheus_retention_time: "15d"
+prometheus_retention_size: "0"
+
+# Scrape configuration
+prometheus_scrape_interval: "5s"
+prometheus_evaluation_interval: "5s"
+prometheus_external_labels:
+  monitor: "mattermost-monitor"
+
+# Mattermost targets (populated from inventory)
+prometheus_mattermost_targets: []
+
+# Node exporter targets (populated from inventory)
+prometheus_node_exporter_targets: []
+
+# Firewall configuration
+prometheus_configure_firewall: true
+prometheus_firewall_port: 9090
+prometheus_firewall_allowed_sources: []
+
+# Enable/disable components
+prometheus_enable_alertmanager: false
+prometheus_alertmanager_url: ""
+
+# Nginx reverse proxy configuration (optional, for TLS termination)
+prometheus_enable_nginx: false
+prometheus_nginx_server_name: "prometheus.example.com"
+prometheus_nginx_ssl_enabled: true

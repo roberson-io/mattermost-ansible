@@ -1,0 +1,238 @@
+---
+# Grafana installation and configuration tasks
+
+- name: Create Grafana system group
+  ansible.builtin.group:
+    name: "{{ grafana_group }}"
+    system: "{{ grafana_system_user }}"
+    state: present
+
+- name: Create Grafana system user
+  ansible.builtin.user:
+    name: "{{ grafana_user }}"
+    group: "{{ grafana_group }}"
+    system: "{{ grafana_system_user }}"
+    shell: /usr/sbin/nologin
+    home: "{{ grafana_data_dir }}"
+    create_home: false
+    state: present
+
+- name: Create Grafana directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ grafana_user }}"
+    group: "{{ grafana_group }}"
+    mode: "0755"
+  loop:
+    - "{{ grafana_install_path }}"
+    - /etc/grafana
+    - "{{ grafana_data_dir }}"
+    - "{{ grafana_logs_dir }}"
+    - "{{ grafana_plugins_dir }}"
+    - "{{ grafana_provisioning_dir }}"
+    - "{{ grafana_provisioning_dir }}/datasources"
+    - "{{ grafana_provisioning_dir }}/dashboards"
+    - "{{ grafana_dashboards_path }}"
+
+- name: Check if Grafana is already installed
+  ansible.builtin.stat:
+    path: "{{ grafana_install_path }}/bin/grafana-server"
+  register: grafana_binary
+
+- name: Get installed Grafana version
+  ansible.builtin.command:
+    cmd: "{{ grafana_install_path }}/bin/grafana-server --version"
+  register: grafana_installed_version
+  changed_when: false
+  failed_when: false
+  when: grafana_binary.stat.exists
+
+- name: Set fact for version check
+  ansible.builtin.set_fact:
+    grafana_needs_install: >-
+      {{ not grafana_binary.stat.exists or
+         'Version ' + grafana_version not in grafana_installed_version.stdout }}
+
+- name: Download Grafana binary
+  ansible.builtin.get_url:
+    url: "{{ grafana_download_url }}"
+    dest: "/tmp/grafana-{{ grafana_version }}.tar.gz"
+    mode: "0644"
+  when: grafana_needs_install
+
+- name: Extract Grafana binary
+  ansible.builtin.unarchive:
+    src: "/tmp/grafana-{{ grafana_version }}.tar.gz"
+    dest: "/tmp"
+    remote_src: true
+  when: grafana_needs_install
+
+- name: Copy Grafana files to install path
+  ansible.builtin.copy:
+    src: "/tmp/grafana-v{{ grafana_version }}/"
+    dest: "{{ grafana_install_path }}/"
+    owner: "{{ grafana_user }}"
+    group: "{{ grafana_group }}"
+    mode: preserve
+    remote_src: true
+  when: grafana_needs_install
+  notify: Restart grafana
+
+- name: Remove temporary files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/tmp/grafana-{{ grafana_version }}.tar.gz"
+    - "/tmp/grafana-v{{ grafana_version }}"
+  when: grafana_needs_install
+
+- name: Create Grafana database in PostgreSQL
+  community.postgresql.postgresql_db:
+    name: "{{ grafana_database_name }}"
+    state: present
+  delegate_to: "{{ groups['database'][0] }}"
+  become: true
+  become_user: postgres
+  when:
+    - groups.database is defined
+    - groups.database | length > 0
+
+- name: Create Grafana database user in PostgreSQL
+  community.postgresql.postgresql_user:
+    name: "{{ grafana_database_user }}"
+    password: "{{ grafana_database_password }}"
+    state: present
+  delegate_to: "{{ groups['database'][0] }}"
+  become: true
+  become_user: postgres
+  when:
+    - groups.database is defined
+    - groups.database | length > 0
+  no_log: true
+
+- name: Grant privileges to Grafana user
+  community.postgresql.postgresql_privs:
+    database: "{{ grafana_database_name }}"
+    roles: "{{ grafana_database_user }}"
+    type: database
+    privs: ALL
+    state: present
+  delegate_to: "{{ groups['database'][0] }}"
+  become: true
+  become_user: postgres
+  when:
+    - groups.database is defined
+    - groups.database | length > 0
+
+- name: Create Grafana configuration file
+  ansible.builtin.template:
+    src: grafana.ini.j2
+    dest: "{{ grafana_config_file }}"
+    owner: "{{ grafana_user }}"
+    group: "{{ grafana_group }}"
+    mode: "0640"
+  notify: Restart grafana
+
+- name: Provision Prometheus data source
+  ansible.builtin.template:
+    src: datasource-prometheus.yml.j2
+    dest: "{{ grafana_provisioning_dir }}/datasources/prometheus.yml"
+    owner: "{{ grafana_user }}"
+    group: "{{ grafana_group }}"
+    mode: "0644"
+  notify: Restart grafana
+
+- name: Provision dashboards configuration
+  ansible.builtin.template:
+    src: dashboards.yml.j2
+    dest: "{{ grafana_provisioning_dir }}/dashboards/dashboards.yml"
+    owner: "{{ grafana_user }}"
+    group: "{{ grafana_group }}"
+    mode: "0644"
+  when: grafana_provision_dashboards
+  notify: Restart grafana
+
+- name: Copy Mattermost dashboards to Grafana
+  ansible.builtin.copy:
+    src: "dashboards/"
+    dest: "{{ grafana_dashboards_path }}/"
+    owner: "{{ grafana_user }}"
+    group: "{{ grafana_group }}"
+    mode: "0644"
+  when: grafana_provision_dashboards
+  notify: Restart grafana
+
+- name: Fix datasource template variables in provisioned dashboards
+  ansible.builtin.replace:
+    path: "{{ grafana_dashboards_path }}/{{ item }}"
+    regexp: '\$\{DS_(PROMETHEUS|MATTERMOST)\}'
+    replace: 'DS_\1'
+  loop:
+    - mattermost-performance-monitoring-v2.json
+    - mattermost-notification-health.json
+    - mattermost-performance-kpi.json
+    - mattermost-bonus-metrics.json
+    - mattermost-web-app-metrics.json
+    - mattermost-desktop-app-metrics.json
+    - mattermost-mobile-metrics.json
+  when: grafana_provision_dashboards
+  notify: Restart grafana
+
+- name: Create Grafana systemd service
+  ansible.builtin.template:
+    src: grafana.service.j2
+    dest: /etc/systemd/system/grafana.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart grafana
+
+- name: Enable and start Grafana service
+  ansible.builtin.systemd:
+    name: grafana
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Deploy nginx configuration for Grafana
+  ansible.builtin.template:
+    src: nginx-grafana.conf.j2
+    dest: /etc/nginx/sites-available/grafana.conf
+    owner: root
+    group: root
+    mode: "0644"
+  when: grafana_enable_nginx
+  notify: Restart nginx
+
+- name: Enable nginx site for Grafana
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/grafana.conf
+    dest: /etc/nginx/sites-enabled/grafana.conf
+    state: link
+  when: grafana_enable_nginx
+  notify: Restart nginx
+
+- name: Configure firewall for Grafana (firewalld)
+  ansible.posix.firewalld:
+    port: "{{ grafana_firewall_port }}/tcp"
+    permanent: true
+    state: enabled
+    immediate: true
+  when:
+    - grafana_configure_firewall | bool
+    - ansible_os_family == "RedHat"
+  failed_when: false
+
+- name: Configure firewall for Grafana (ufw)
+  community.general.ufw:
+    rule: allow
+    port: "{{ grafana_firewall_port }}"
+    proto: tcp
+  when:
+    - grafana_configure_firewall | bool
+    - ansible_os_family == "Debian"
+  failed_when: false

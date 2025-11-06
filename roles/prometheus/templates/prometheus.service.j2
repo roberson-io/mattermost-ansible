@@ -1,0 +1,31 @@
+[Unit]
+Description=Prometheus
+Documentation=https://prometheus.io/docs/introduction/overview/
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User={{ prometheus_user }}
+Group={{ prometheus_group }}
+ExecStart={{ prometheus_install_path }}/prometheus \
+  --config.file={{ prometheus_config_dir }}/prometheus.yml \
+  --storage.tsdb.path={{ prometheus_data_dir }} \
+  --web.console.templates={{ prometheus_config_dir }}/consoles \
+  --web.console.libraries={{ prometheus_config_dir }}/console_libraries \
+  --web.listen-address={{ prometheus_listen_address }} \
+  --storage.tsdb.retention.time={{ prometheus_retention_time }} \
+{% if prometheus_retention_size != "0" %}
+  --storage.tsdb.retention.size={{ prometheus_retention_size }} \
+{% endif %}
+{% if prometheus_web_external_url %}
+  --web.external-url={{ prometheus_web_external_url }} \
+{% endif %}
+  --web.enable-lifecycle
+
+SyslogIdentifier=prometheus
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

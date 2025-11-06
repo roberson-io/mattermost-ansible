@@ -118,3 +118,7 @@ mattermost_calls_enable_ipv6: false  # Enable dual-stack IPv6
 mattermost_calls_enable_ringing: true  # Enable ringing for DM/GM calls
 mattermost_calls_max_call_participants: 0  # Max participants per call (0 = unlimited)
 mattermost_calls_allow_screen_sharing: true  # Allow screen sharing in calls
+
+# Performance monitoring configuration (requires Enterprise license)
+mattermost_enable_performance_monitoring: false  # Set to true to enable Prometheus metrics endpoint
+mattermost_performance_monitoring_listen_address: ":8067"  # Port-only format for metrics endpoint

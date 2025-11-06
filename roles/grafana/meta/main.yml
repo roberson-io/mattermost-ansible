@@ -1,0 +1,24 @@
+---
+galaxy_info:
+  role_name: grafana
+  author: Mattermost
+  description: Install and configure Grafana for Mattermost monitoring
+  license: ""
+  min_ansible_version: "2.9"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+        - noble
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+  galaxy_tags:
+    - grafana
+    - monitoring
+    - mattermost
+    - visualization
+
+dependencies: []

@@ -1,0 +1,16 @@
+---
+# Grafana role handlers
+
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Restart grafana
+  ansible.builtin.systemd:
+    name: grafana
+    state: restarted
+
+- name: Restart nginx
+  ansible.builtin.systemd:
+    name: nginx
+    state: restarted

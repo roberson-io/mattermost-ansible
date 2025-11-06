@@ -1,0 +1,117 @@
+---
+# Node Exporter installation and configuration tasks
+
+- name: Create node_exporter system group
+  ansible.builtin.group:
+    name: "{{ node_exporter_group }}"
+    system: "{{ node_exporter_system_user }}"
+    state: present
+
+- name: Create node_exporter system user
+  ansible.builtin.user:
+    name: "{{ node_exporter_user }}"
+    group: "{{ node_exporter_group }}"
+    system: "{{ node_exporter_system_user }}"
+    shell: /usr/sbin/nologin
+    create_home: false
+    state: present
+
+- name: Create node_exporter directory
+  ansible.builtin.file:
+    path: "{{ node_exporter_install_path }}"
+    state: directory
+    owner: "{{ node_exporter_user }}"
+    group: "{{ node_exporter_group }}"
+    mode: "0755"
+
+- name: Check if node_exporter is already installed
+  ansible.builtin.stat:
+    path: "{{ node_exporter_install_path }}/node_exporter"
+  register: node_exporter_binary
+
+- name: Get installed node_exporter version
+  ansible.builtin.command:
+    cmd: "{{ node_exporter_install_path }}/node_exporter --version"
+  register: node_exporter_installed_version
+  changed_when: false
+  failed_when: false
+  when: node_exporter_binary.stat.exists
+
+- name: Set fact for version check
+  ansible.builtin.set_fact:
+    node_exporter_needs_install: >-
+      {{ not node_exporter_binary.stat.exists or
+         'node_exporter, version ' + node_exporter_version not in node_exporter_installed_version.stdout }}
+
+- name: Download node_exporter binary
+  ansible.builtin.get_url:
+    url: "{{ node_exporter_download_url }}"
+    dest: "/tmp/node_exporter-{{ node_exporter_version }}.tar.gz"
+    mode: "0644"
+  when: node_exporter_needs_install
+
+- name: Extract node_exporter binary
+  ansible.builtin.unarchive:
+    src: "/tmp/node_exporter-{{ node_exporter_version }}.tar.gz"
+    dest: "/tmp"
+    remote_src: true
+  when: node_exporter_needs_install
+
+- name: Copy node_exporter binary to install path
+  ansible.builtin.copy:
+    src: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter"
+    dest: "{{ node_exporter_install_path }}/node_exporter"
+    owner: "{{ node_exporter_user }}"
+    group: "{{ node_exporter_group }}"
+    mode: "0755"
+    remote_src: true
+  when: node_exporter_needs_install
+  notify: Restart node_exporter
+
+- name: Remove temporary files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/tmp/node_exporter-{{ node_exporter_version }}.tar.gz"
+    - "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64"
+  when: node_exporter_needs_install
+
+- name: Create node_exporter systemd service
+  ansible.builtin.template:
+    src: node_exporter.service.j2
+    dest: /etc/systemd/system/node_exporter.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart node_exporter
+
+- name: Enable and start node_exporter service
+  ansible.builtin.systemd:
+    name: node_exporter
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Configure firewall for node_exporter (firewalld)
+  ansible.posix.firewalld:
+    port: "{{ node_exporter_firewall_port }}/tcp"
+    permanent: true
+    state: enabled
+    immediate: true
+  when:
+    - node_exporter_configure_firewall | bool
+    - ansible_os_family == "RedHat"
+  failed_when: false
+
+- name: Configure firewall for node_exporter (ufw)
+  community.general.ufw:
+    rule: allow
+    port: "{{ node_exporter_firewall_port }}"
+    proto: tcp
+  when:
+    - node_exporter_configure_firewall | bool
+    - ansible_os_family == "Debian"
+  failed_when: false

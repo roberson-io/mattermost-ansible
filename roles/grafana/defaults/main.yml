@@ -1,0 +1,66 @@
+---
+# Grafana role default variables
+
+# Grafana version
+grafana_version: "11.5.0"
+grafana_download_url: "https://dl.grafana.com/oss/release/grafana-{{ grafana_version }}.linux-amd64.tar.gz"
+
+# Installation paths
+grafana_install_path: "/opt/grafana"
+grafana_config_file: "/etc/grafana/grafana.ini"
+grafana_data_dir: "/var/lib/grafana"
+grafana_logs_dir: "/var/log/grafana"
+grafana_plugins_dir: "/var/lib/grafana/plugins"
+grafana_provisioning_dir: "/etc/grafana/provisioning"
+grafana_dashboard_dir: "/var/lib/grafana/dashboards"
+
+# System user and group
+grafana_user: "grafana"
+grafana_group: "grafana"
+grafana_system_user: true
+
+# Server configuration
+grafana_http_port: 3000
+grafana_http_addr: "0.0.0.0"
+grafana_domain: "localhost"
+grafana_root_url: "%(protocol)s://%(domain)s:%(http_port)s/"
+
+# Database configuration (PostgreSQL)
+grafana_database_type: "postgres"
+grafana_database_host: >-
+  {{
+    hostvars[groups['database'][0]]['ansible_default_ipv4']['address']
+    if groups['database'] is defined and groups['database'] | length > 0
+    else 'localhost'
+  }}
+grafana_database_port: 5432
+grafana_database_name: "grafana"
+grafana_database_user: "grafana"
+grafana_database_password: "{{ vault_local_grafana_database_password }}"
+
+# Admin user configuration
+grafana_admin_user: "admin"
+grafana_admin_password: "{{ vault_local_grafana_admin_password }}"
+
+# Security settings
+grafana_secret_key: "{{ vault_local_grafana_secret_key }}"
+grafana_disable_gravatar: false
+grafana_allow_embedding: false
+
+# Prometheus data source configuration
+grafana_prometheus_url: "http://localhost:9090"
+grafana_prometheus_datasource_name: "Prometheus"
+
+# Dashboard provisioning
+grafana_provision_dashboards: true
+grafana_dashboards_path: "/var/lib/grafana/dashboards"
+
+# Firewall configuration
+grafana_configure_firewall: true
+grafana_firewall_port: 3000
+grafana_firewall_allowed_sources: []
+
+# Nginx reverse proxy configuration (optional, for TLS termination)
+grafana_enable_nginx: false
+grafana_nginx_server_name: "grafana.example.com"
+grafana_nginx_ssl_enabled: true

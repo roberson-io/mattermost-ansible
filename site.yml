@@ -227,6 +227,35 @@
     - role: coturn
       when: enable_coturn | default(false)
 
+- name: Deploy Prometheus Monitoring
+  hosts: monitoring
+  become: true
+  gather_facts: true
+  pre_tasks:
+    - name: Install Python SELinux support (RedHat/Rocky)
+      ansible.builtin.raw: dnf install -y python3-libselinux
+      when: ansible_os_family == "RedHat"
+      changed_when: false
+  roles:
+    - role: prometheus
+      when: enable_monitoring | default(false)
+
+- name: Deploy Grafana Visualization
+  hosts: monitoring
+  become: true
+  gather_facts: true
+  roles:
+    - role: grafana
+      when: enable_monitoring | default(false)
+
+- name: Deploy Node Exporter on Mattermost Servers
+  hosts: app
+  become: true
+  gather_facts: true
+  roles:
+    - role: node_exporter
+      when: enable_monitoring | default(false)
+
 - name: Deploy calls-offloader Service
   hosts: calls_offloader
   become: true
@@ -342,5 +371,13 @@
           - >-
             OpenLDAP URLs: {{ ldap_hosts | map('regex_replace', '^(.*)$', 'ldap://\1:389') | join(', ')
             if (enable_ldap | default(false) and ldap_hosts is defined and ldap_hosts | length > 0)
+            else 'Not configured' }}
+          - >-
+            Prometheus URL: {{ 'http://' + hostvars[groups['monitoring'][0]]['ansible_default_ipv4']['address'] + ':9090'
+            if (enable_monitoring | default(false) and groups['monitoring'] is defined and groups['monitoring'] | length > 0)
+            else 'Not configured' }}
+          - >-
+            Grafana URL: {{ 'http://' + hostvars[groups['monitoring'][0]]['ansible_default_ipv4']['address'] + ':3000'
+            if (enable_monitoring | default(false) and groups['monitoring'] is defined and groups['monitoring'] | length > 0)
             else 'Not configured' }}
           - "Create your admin account on first visit"

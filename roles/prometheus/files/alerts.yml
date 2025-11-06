@@ -1,0 +1,208 @@
+---
+# Prometheus Alerting Rules for Mattermost
+# Managed by Ansible
+
+groups:
+  - name: mattermost_alerts
+    interval: 30s
+    rules:
+      # Instance availability
+      - alert: MattermostInstanceDown
+        expr: up{job="mattermost"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Mattermost instance {{ $labels.instance }} is down"
+          description: "Mattermost instance {{ $labels.instance }} has been down for more than 1 minute."
+
+      - alert: PrometheusDown
+        expr: up{job="prometheus"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prometheus instance {{ $labels.instance }} is down"
+          description: "Prometheus monitoring is not collecting metrics."
+
+      - alert: NodeExporterDown
+        expr: up{job="node_exporter"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Node Exporter on {{ $labels.instance }} is down"
+          description: "System metrics are not being collected from {{ $labels.instance }}."
+
+      # API Performance
+      - alert: HighAPIResponseTime
+        expr: histogram_quantile(0.95, rate(mattermost_http_request_duration_seconds_bucket[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High API response time on {{ $labels.instance }}"
+          description: "95th percentile API response time is {{ $value }}s (threshold: 1s)."
+
+      - alert: HighAPIErrorRate
+        expr: rate(mattermost_http_errors_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High API error rate on {{ $labels.instance }}"
+          description: "API error rate is {{ $value }} errors/sec."
+
+      # Resource utilization
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value | humanize }}%."
+
+      - alert: CriticalCPUUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 95
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical CPU usage on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value | humanize }}%."
+
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage is {{ $value | humanize }}%."
+
+      - alert: CriticalMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 95
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical memory usage on {{ $labels.instance }}"
+          description: "Memory usage is {{ $value | humanize }}%."
+
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes{fstype!~"tmpfs|fuse.lxcfs"} / node_filesystem_size_bytes{fstype!~"tmpfs|fuse.lxcfs"}) * 100 < 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low disk space on {{ $labels.instance }}:{{ $labels.mountpoint }}"
+          description: "Disk space is {{ $value | humanize }}% available."
+
+      - alert: DiskSpaceCritical
+        expr: (node_filesystem_avail_bytes{fstype!~"tmpfs|fuse.lxcfs"} / node_filesystem_size_bytes{fstype!~"tmpfs|fuse.lxcfs"}) * 100 < 5
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical disk space on {{ $labels.instance }}:{{ $labels.mountpoint }}"
+          description: "Disk space is {{ $value | humanize }}% available."
+
+      # WebSocket connections
+      - alert: HighWebSocketConnections
+        expr: mattermost_http_websockets_total > 10000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High WebSocket connections on {{ $labels.instance }}"
+          description: "WebSocket connections: {{ $value }}."
+
+      # Database connections
+      - alert: HighDatabaseConnections
+        expr: mattermost_db_master_connections_total > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High database connections on {{ $labels.instance }}"
+          description: "Database connections: {{ $value }} (consider increasing max_connections)."
+
+      - alert: DatabaseConnectionErrors
+        expr: rate(mattermost_db_master_conn_max_lifetime_closed_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Database connection errors on {{ $labels.instance }}"
+          description: "Database connection lifetime closures: {{ $value }}/sec."
+
+      # Cache performance
+      - alert: LowCacheHitRate
+        expr: rate(mattermost_cache_hits_total[5m]) / (rate(mattermost_cache_hits_total[5m]) + rate(mattermost_cache_misses_total[5m])) < 0.7
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low cache hit rate on {{ $labels.instance }}"
+          description: "Cache hit rate is {{ $value | humanizePercentage }}."
+
+      # Cluster health (HA deployments)
+      - alert: ClusterNodeUnhealthy
+        expr: mattermost_cluster_cluster_health_score < 1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Cluster node {{ $labels.instance }} is unhealthy"
+          description: "Cluster health score: {{ $value }}."
+
+      # Process health
+      - alert: TooManyGoroutines
+        expr: go_goroutines{job="mattermost"} > 10000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Too many goroutines on {{ $labels.instance }}"
+          description: "Goroutine count: {{ $value }} (possible goroutine leak)."
+
+  - name: system_alerts
+    interval: 60s
+    rules:
+      # System health
+      - alert: HighLoadAverage
+        expr: node_load15 / count(node_cpu_seconds_total{mode="idle"}) without (cpu,mode) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High load average on {{ $labels.instance }}"
+          description: "15-minute load average per CPU: {{ $value | humanize }}."
+
+      - alert: DiskIOSaturation
+        expr: rate(node_disk_io_time_seconds_total[5m]) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disk I/O saturation on {{ $labels.instance }}"
+          description: "Disk {{ $labels.device }} is saturated ({{ $value | humanizePercentage }} busy)."
+
+      - alert: NetworkReceiveErrors
+        expr: rate(node_network_receive_errs_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Network receive errors on {{ $labels.instance }}"
+          description: "Network interface {{ $labels.device }} receiving errors: {{ $value }}/sec."
+
+      - alert: NetworkTransmitErrors
+        expr: rate(node_network_transmit_errs_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Network transmit errors on {{ $labels.instance }}"
+          description: "Network interface {{ $labels.device }} transmitting errors: {{ $value }}/sec."

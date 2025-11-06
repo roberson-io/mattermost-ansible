@@ -1,4 +1,4 @@
-.PHONY: help ci clean clean-all deploy-local deploy-local-check deploy-production deploy-production-check deploy-staging deploy-staging-check install lint lint-fix orb-create-vm-calls-offloader-rocky orb-create-vm-calls-offloader-ubuntu orb-create-vm-coturn-rocky orb-create-vm-coturn-ubuntu orb-create-vm-loadbalancer-rocky orb-create-vm-loadbalancer-ubuntu orb-create-vms orb-create-vms-ha-cluster-rocky orb-create-vms-ha-cluster-ubuntu orb-create-vms-rocky orb-create-vms-ubuntu orb-delete-vm-calls-offloader-rocky orb-delete-vm-calls-offloader-ubuntu orb-delete-vm-coturn-rocky orb-delete-vm-coturn-ubuntu orb-delete-vm-loadbalancer-rocky orb-delete-vm-loadbalancer-ubuntu orb-delete-vms orb-delete-vms-ha-cluster-rocky orb-delete-vms-ha-cluster-ubuntu orb-delete-vms-rocky orb-delete-vms-ubuntu ping-local ping-production ping-staging safety-check setup syntax-check test test-all test-certbot test-integration test-integration-check-vms test-integration-db-config test-mattermost test-mattermost-boards test-mattermost-calls test-mattermost-db-config test-mattermost-migrate-to-db test-mattermost-rocky test-nginx test-nginx-rocky test-postgresql test-postgresql-rocky test-rocky test-rtcd test-ubuntu test-unit vault-create vault-create-secure vault-decrypt vault-edit vault-encrypt vault-rekey vault-view
+.PHONY: help ci clean clean-all deploy-local deploy-local-check deploy-production deploy-production-check deploy-staging deploy-staging-check install lint lint-fix orb-create-vm-calls-offloader-rocky orb-create-vm-calls-offloader-ubuntu orb-create-vm-coturn-rocky orb-create-vm-coturn-ubuntu orb-create-vm-loadbalancer-rocky orb-create-vm-loadbalancer-ubuntu orb-create-vm-monitoring-rocky orb-create-vm-monitoring-ubuntu orb-create-vms orb-create-vms-ha-cluster-rocky orb-create-vms-ha-cluster-ubuntu orb-create-vms-rocky orb-create-vms-ubuntu orb-delete-vm-calls-offloader-rocky orb-delete-vm-calls-offloader-ubuntu orb-delete-vm-coturn-rocky orb-delete-vm-coturn-ubuntu orb-delete-vm-loadbalancer-rocky orb-delete-vm-loadbalancer-ubuntu orb-delete-vm-monitoring-rocky orb-delete-vm-monitoring-ubuntu orb-delete-vms orb-delete-vms-ha-cluster-rocky orb-delete-vms-ha-cluster-ubuntu orb-delete-vms-rocky orb-delete-vms-ubuntu ping-local ping-production ping-staging safety-check setup syntax-check test test-all test-certbot test-integration test-integration-check-vms test-integration-db-config test-mattermost test-mattermost-boards test-mattermost-calls test-mattermost-db-config test-mattermost-migrate-to-db test-mattermost-rocky test-nginx test-nginx-rocky test-postgresql test-postgresql-rocky test-rocky test-rtcd test-ubuntu test-unit vault-create vault-create-secure vault-decrypt vault-edit vault-encrypt vault-rekey vault-view
 
 # Default target
 .DEFAULT_GOAL := help
@@ -151,6 +151,16 @@ orb-create-vm-loadbalancer-ubuntu: ## Create load balancer VM (Ubuntu)
 	@echo "Creating load balancer VM (Ubuntu)..."
 	@orb create -a amd64 ubuntu loadbalancer-ubuntu || echo "loadbalancer-ubuntu may already exist"
 	@echo "✓ Load balancer VM created. Add to inventory: [loadbalancer] $(USER)@loadbalancer-ubuntu@orb"
+
+orb-create-vm-monitoring-rocky: ## Create monitoring VM (Rocky Linux 9)
+	@echo "Creating monitoring VM (Rocky Linux 9)..."
+	@orb create -a amd64 rocky:9 monitoring-rocky || echo "monitoring-rocky may already exist"
+	@echo "✓ Monitoring VM created. Add to inventory: [monitoring] $(USER)@monitoring-rocky@orb"
+
+orb-create-vm-monitoring-ubuntu: ## Create monitoring VM (Ubuntu)
+	@echo "Creating monitoring VM (Ubuntu)..."
+	@orb create -a amd64 ubuntu monitoring-ubuntu || echo "monitoring-ubuntu may already exist"
+	@echo "✓ Monitoring VM created. Add to inventory: [monitoring] $(USER)@monitoring-ubuntu@orb"
 
 orb-create-vm-minio-rocky: ## Create MinIO VM (Rocky Linux 9)
 	@echo "Creating MinIO VM (Rocky Linux 9)..."
@@ -357,6 +367,14 @@ orb-delete-vm-loadbalancer-rocky: ## Delete load balancer VM (Rocky)
 orb-delete-vm-loadbalancer-ubuntu: ## Delete load balancer VM (Ubuntu)
 	@orb delete -f loadbalancer-ubuntu 2>/dev/null || true
 	@echo "✓ Load balancer VM deleted"
+
+orb-delete-vm-monitoring-rocky: ## Delete monitoring VM (Rocky)
+	@orb delete -f monitoring-rocky 2>/dev/null || true
+	@echo "✓ Monitoring VM deleted"
+
+orb-delete-vm-monitoring-ubuntu: ## Delete monitoring VM (Ubuntu)
+	@orb delete -f monitoring-ubuntu 2>/dev/null || true
+	@echo "✓ Monitoring VM deleted"
 
 orb-delete-vm-app%-rocky: ## Delete Mattermost app node VM (Rocky) - Usage: make orb-delete-vm-app1-rocky
 	@orb delete -f mattermost$*-rocky 2>/dev/null || true

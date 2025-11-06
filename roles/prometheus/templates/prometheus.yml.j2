@@ -1,0 +1,49 @@
+# Prometheus configuration file
+# Managed by Ansible
+
+global:
+  scrape_interval: {{ prometheus_scrape_interval }}
+  evaluation_interval: {{ prometheus_evaluation_interval }}
+  external_labels:
+{% for key, value in prometheus_external_labels.items() %}
+    {{ key }}: '{{ value }}'
+{% endfor %}
+
+# Alerting rules
+rule_files:
+  - "alerts.yml"
+
+{% if prometheus_enable_alertmanager and prometheus_alertmanager_url %}
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - {{ prometheus_alertmanager_url }}
+{% endif %}
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'mattermost'
+    static_configs:
+      - targets:
+{% if prometheus_mattermost_targets | length > 0 %}
+{% for target in prometheus_mattermost_targets %}
+          - '{{ target }}'
+{% endfor %}
+{% else %}
+          []
+{% endif %}
+
+  - job_name: 'node_exporter'
+    static_configs:
+      - targets:
+{% if prometheus_node_exporter_targets | length > 0 %}
+{% for target in prometheus_node_exporter_targets %}
+          - '{{ target }}'
+{% endfor %}
+{% else %}
+          []
+{% endif %}
