@@ -1,0 +1,37 @@
+---
+# Ansible Lint Configuration
+
+# Exclude external/imported roles from linting
+exclude_paths:
+  - venv/
+  - .git/
+  - .ansible/
+  - roles/rhel9STIG/          # Official DISA STIG role
+  - roles/rhel8STIG/          # Official DISA STIG role
+  - roles/ubuntu20STIG/       # Official DISA STIG role
+  - roles/ubuntu22STIG/       # Official DISA STIG role
+  - roles/ubuntu24STIG/       # Official DISA STIG role
+  - '*.example'               # Example files
+
+# Skip specific rules
+skip_list:
+  - run-once[task]  # We use run_once intentionally for cluster operations
+  - command-instead-of-module  # Some systemd operations need direct command for cross-platform compatibility
+  - role-name  # External STIG roles (rhel9STIG) don't follow our naming convention
+  - jinja[spacing]  # Complex conditionals may not perfectly match linter preference
+
+# Enable progressive mode (only error on new violations)
+# progressive: true
+
+# Use default rules
+# See: https://ansible-lint.readthedocs.io/rules/
+
+# Note: This configuration excludes external/imported DISA STIG roles from linting.
+# These roles come from dl.dod.cyber.mil and are maintained by DISA, not this project.
+# They are installed via: ./scripts/install_disa_stig_roles.py
+#
+# To lint only your own roles:
+#   make lint
+#
+# To see which files are being linted:
+#   ansible-lint site.yml --list-files 2>/dev/null | wc -l

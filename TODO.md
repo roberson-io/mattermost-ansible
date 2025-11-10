@@ -311,61 +311,77 @@ This document tracks the implementation of enterprise-scale features for the Mat
 > **DoD Compliance Note**: This phase implements DISA Security Technical Implementation Guides (STIGs) for US Department of Defense customers. STIGs provide security configuration baselines for government and DoD systems. Findings are categorized as CAT I (critical), CAT II (high), and CAT III (medium) severity.
 
 ### STIG Role Selection and Research
-- [ ] Evaluate ansible-lockdown STIG roles vs RedHat Official roles
-- [ ] Test ansible-lockdown RHEL8-STIG and RHEL9-STIG roles in local environment
-- [ ] Test RedHatOfficial.rhel9_stig role in local environment
-- [ ] Compare disruption levels and remediation coverage
-- [ ] Select primary STIG role approach (recommend: ansible-lockdown + RedHat official as alternative)
-- [ ] Document STIG role selection rationale and trade-offs
+- [x] Evaluate ansible-lockdown STIG roles vs RedHat Official roles
+- [x] Test ansible-lockdown RHEL8-STIG and RHEL9-STIG roles in local environment
+- [x] Test RedHatOfficial.rhel9_stig role in local environment
+- [x] Compare disruption levels and remediation coverage
+- [x] Select primary STIG role approach (disa-official as primary, with ansible-lockdown as alternative)
+- [x] Document STIG role selection rationale and trade-offs (in roles/disa-stig/README.md)
 
 ### STIG Hardening Implementation
-- [ ] Install STIG roles via Ansible Galaxy: `ansible-galaxy install ansible-lockdown.RHEL9-STIG RedHatOfficial.rhel9_stig`
-- [ ] Create `roles/stig-hardening/` wrapper role for STIG application
-- [ ] Add STIG variables to `roles/stig-hardening/defaults/main.yml`:
-  - `stig_enabled: false` (opt-in, disabled by default)
-  - `stig_provider: "ansible-lockdown"` or `"redhat-official"`
-  - `stig_disruption_high: false` (enable disruptive findings)
-  - `stig_cat_1_patch: true`, `stig_cat_2_patch: true`, `stig_cat_3_patch: false`
-  - `stig_audit_only: false` (scan only, no remediation)
-- [ ] Integrate STIG role into site.yml (conditional based on `stig_enabled`)
-- [ ] Add STIG configuration to group_vars examples (local.yml, staging.yml, production.yml)
-- [ ] Test STIG hardening in local OrbStack VMs
-- [ ] Verify Mattermost functionality after STIG hardening
+- [x] Install DISA Official STIG roles via script: `./scripts/install_disa_stig_roles.py`
+- [x] Create `roles/disa-stig/` wrapper role for STIG application (supports multiple providers)
+- [x] Add STIG variables to `roles/disa-stig/defaults/main.yml`:
+  - `disa_stig_enabled: false` (opt-in, disabled by default)
+  - `disa_stig_provider: "disa-official"` (or "redhat-official", "ansible-lockdown")
+  - `disa_stig_mode: "audit"` (ansible-lockdown only; disa-official always remediates)
+  - `disa_stig_cat_1_patch`, `disa_stig_cat_2_patch`, `disa_stig_cat_3_patch` (ansible-lockdown only)
+  - `disa_stig_disruption_high: false` (ansible-lockdown only)
+- [x] Integrate STIG role into site.yml (conditional based on `disa_stig_enabled`)
+- [x] Add STIG configuration to group_vars examples (local.yml, staging.yml, production.yml)
+- [x] Test STIG hardening in local UTM VMs (Rocky Linux 9)
+- [x] Verify Mattermost functionality after STIG hardening (all services operational)
+- [x] Document provider-specific behavior (disa-official always applies, ansible-lockdown has audit mode)
+- [x] Document per-rule control for disa-official (rhel9STIG_stigrule_XXXXX_Manage variables)
+- [x] Fix fapolicyd blocking issues (Mattermost and plugin binaries trusted)
+- [x] Document USG banner behavior and removal for non-government systems
 
-### OpenSCAP Integration
-- [ ] Install scap-security-guide package on target systems
+### Compliance Reporting (XCCDF)
+- [x] Configure stig_xml callback plugin for XCCDF 1.2 report generation
+- [x] Store compliance reports in `compliance-reports/` directory
+- [x] Generate consolidated XCCDF reports (263 rules evaluated, 100% pass in current config)
+- [x] Automatically fetch reports from control machine to compliance-reports/
+- [x] Document report location and format in group_vars
+- [x] Fix report fetching issues (become: false for localhost tasks)
+- [ ] Install scap-security-guide package on target systems (alternative to callback plugin)
 - [ ] Add OpenSCAP pre-hardening scan tasks (baseline compliance check)
-- [ ] Generate Ansible playbooks from SCAP profiles: `oscap xccdf generate fix --fix-type ansible --profile stig`
-- [ ] Add OpenSCAP post-hardening scan tasks (verify compliance)
-- [ ] Store compliance reports in `artifacts/scap-reports/` directory
-- [ ] Create compliance report parsing and summary tasks
 - [ ] Add SCAP scan scheduling capability (cron jobs for continuous compliance)
 
 ### STIG Roles for Services
-- [ ] Research PostgreSQL STIG hardening requirements
+- [ ] Research PostgreSQL STIG hardening requirements (official PostgreSQL STIG available)
 - [ ] Research nginx/web server STIG requirements (consider APACHE-2.4-STIG applicability)
-- [ ] Research Docker/container STIG considerations (DISA Container Platform STIG)
+- [x] Docker/container STIG: Deferred (not critical for current scope)
 - [ ] Research Redis security hardening (no official STIG, use CIS benchmarks)
-- [ ] Research Elasticsearch security hardening
+- [ ] Research Elasticsearch security hardening (no official STIG, use CIS benchmarks)
 - [ ] Document application-level STIG compliance for Mattermost
 
+### Testing Environment Compatibility
+- [x] Verify OrbStack compatibility for non-STIG deployments (CONFIRMED: works perfectly)
+- [x] Document UTM requirement for STIG hardening (kernel parameter limitations in OrbStack)
+- [x] Document environment-specific recommendations (OrbStack=dev, UTM=STIG testing, AWS=production)
+- [x] Ensure all STIG tasks are properly conditional (disa_stig_enabled, fapolicyd checks)
+
 ### Makefile Targets
-- [ ] Add `make stig-apply` target (apply STIG hardening to staging/production)
-- [ ] Add `make stig-scan` target (run OpenSCAP compliance scan)
-- [ ] Add `make stig-report` target (generate and display compliance reports)
-- [ ] Add `make stig-audit` target (audit-only mode, no remediation)
+- [x] Existing `make deploy-local` applies STIG hardening when enabled in local.yml
+- [x] Existing `make lint` validates Ansible code and excludes STIG roles
+- [ ] Add `make stig-report` target (view compliance reports in compliance-reports/)
+- [ ] Add `make stig-audit` target (deploy with audit-only mode for ansible-lockdown)
 
 ### Documentation
-- [ ] Write `docs/stig-hardening.md` covering:
-  - [ ] Overview of DISA STIGs and DoD compliance requirements
-  - [ ] STIG role selection guide (ansible-lockdown vs RedHat official)
-  - [ ] CAT I/II/III finding severity levels and risk acceptance
-  - [ ] Disruptive vs non-disruptive findings
-  - [ ] OpenSCAP scanning and compliance reporting
-  - [ ] STIG hardening workflow (scan → harden → verify)
-  - [ ] Rollback procedures if hardening breaks functionality
-  - [ ] Known limitations and excluded findings
-  - [ ] Integration with staging/production deployments
+- [x] Write `roles/disa-stig/README.md` covering:
+  - [x] Overview of DISA STIGs and DoD compliance requirements
+  - [x] STIG provider comparison (disa-official, ansible-lockdown, redhat-official)
+  - [x] Provider-specific variable usage (CAT I/II/III only for ansible-lockdown)
+  - [x] Per-rule control for disa-official (rhel9STIG_stigrule_XXXXX_Manage)
+  - [x] XCCDF compliance reporting via callback plugin
+  - [x] Vendor testing recommendations (disable USG banner, etc.)
+  - [x] Important behavior differences (disa-official always remediates)
+- [x] Update group_vars with clear provider-specific documentation
+- [x] Configure .ansible-lint to exclude external STIG roles
+- [x] Configure .yamllint to exclude external STIG roles
+- [ ] Write `docs/stig-hardening.md` with deployment workflows and troubleshooting
+- [ ] Document rollback procedures if hardening breaks functionality
+- [ ] Document known limitations (23 rules skip when GUI/optional packages not installed)
 
 ---
 

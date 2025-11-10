@@ -17,42 +17,41 @@
 
 # Install Go
 - name: Check if Go is already installed
-  ansible.builtin.command: go version
+  ansible.builtin.stat:
+    path: /usr/local/go/bin/go
   register: minio_go_check
-  changed_when: false
-  failed_when: false
 
 - name: Get latest Go version
   ansible.builtin.uri:
     url: https://go.dev/VERSION?m=text
     return_content: true
   register: minio_go_latest_version
-  when: minio_go_check.rc != 0
+  when: not minio_go_check.stat.exists
 
 - name: Set Go version to install
   ansible.builtin.set_fact:
     minio_go_version_to_install: "{{ minio_go_latest_version.content.split('\n')[0] | regex_replace('^go', '') | trim }}"
-  when: minio_go_check.rc != 0
+  when: not minio_go_check.stat.exists
 
 - name: Download Go
   ansible.builtin.get_url:
     url: "https://go.dev/dl/go{{ minio_go_version_to_install }}.linux-amd64.tar.gz"
     dest: "/tmp/go{{ minio_go_version_to_install }}.linux-amd64.tar.gz"
     mode: "0644"
-  when: minio_go_check.rc != 0
+  when: not minio_go_check.stat.exists
 
 - name: Remove old Go installation
   ansible.builtin.file:
     path: /usr/local/go
     state: absent
-  when: minio_go_check.rc != 0
+  when: not minio_go_check.stat.exists
 
 - name: Extract Go
   ansible.builtin.unarchive:
     src: "/tmp/go{{ minio_go_version_to_install }}.linux-amd64.tar.gz"
     dest: /usr/local
     remote_src: true
-  when: minio_go_check.rc != 0
+  when: not minio_go_check.stat.exists
 
 - name: Add Go to PATH
   ansible.builtin.copy:
@@ -62,7 +61,7 @@
       export PATH=$PATH:$GOPATH/bin
     dest: /etc/profile.d/go.sh
     mode: "0644"
-  when: minio_go_check.rc != 0
+  when: not minio_go_check.stat.exists
 
 # Create MinIO user and directories
 - name: Create minio group
@@ -215,3 +214,31 @@
   when:
     - ansible_os_family == "RedHat"
     - minio_firewalld_check.rc == 0
+
+# SELinux configuration
+- name: Set SELinux file context policy for MinIO binary
+  community.general.sefcontext:
+    target: "{{ minio_install_path }}/bin/minio"
+    setype: bin_t
+    state: present
+  when:
+    - ansible_os_family == "RedHat"
+    - ansible_selinux.status == "enabled"
+
+- name: Set SELinux file context policy for MinIO data directory
+  community.general.sefcontext:
+    target: "{{ minio_data_path }}(/.*)?"
+    setype: usr_t
+    state: present
+  when:
+    - ansible_os_family == "RedHat"
+    - ansible_selinux.status == "enabled"
+
+- name: Apply SELinux context to MinIO installation
+  ansible.builtin.command:
+    cmd: restorecon -RF {{ minio_install_path }} {{ minio_data_path }}
+  changed_when: false
+  when:
+    - ansible_os_family == "RedHat"
+    - ansible_selinux.status == "enabled"
+  notify: Restart minio

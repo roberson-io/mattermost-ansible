@@ -1,0 +1,39 @@
+---
+# Ubuntu 24.04 LTS STIG tasks
+
+- name: Display Ubuntu 24.04 STIG information
+  ansible.builtin.debug:
+    msg: "Applying DISA STIG for Ubuntu 24.04 using {{ disa_stig_provider }} provider"
+
+# DISA Official not yet available for Ubuntu 24.04
+- name: Fail if disa-official provider requested but unavailable
+  ansible.builtin.fail:
+    msg: >-
+      Official DISA STIG playbook not yet available for Ubuntu 24.04 as of 2025.
+      Please use disa_stig_provider: "ansible-lockdown" or wait for DISA to release Ubuntu 24.04 STIG.
+  when: disa_stig_provider == "disa-official"
+
+# Community ansible-lockdown
+- name: Apply Ubuntu 24.04 STIG using ansible-lockdown
+  ansible.builtin.include_role:
+    name: "ansible-lockdown.UBUNTU24-STIG"
+  vars:
+    ubuntu24stig_disruption_high: "{{ disa_stig_disruption_high }}"
+    ubuntu24stig_cat1_patch: "{{ disa_stig_cat_1_patch }}"
+    ubuntu24stig_cat2_patch: "{{ disa_stig_cat_2_patch }}"
+    ubuntu24stig_cat3_patch: "{{ disa_stig_cat_3_patch }}"
+    ubuntu24stig_run_audit: "{{ true if disa_stig_mode == 'audit' else false }}"
+    ubuntu24stig_audit_format: "{{ disa_stig_goss_format }}"
+    system_is_container: false
+  when: disa_stig_provider == "ansible-lockdown"
+
+- name: Fetch STIG audit reports
+  ansible.builtin.fetch:
+    src: "/tmp/{{ ansible_hostname }}_stig_audit.{{ disa_stig_goss_format }}"
+    dest: "{{ disa_stig_audit_report_dir }}/{{ ansible_hostname }}_stig_audit.{{ disa_stig_goss_format }}"
+    flat: true
+  when:
+    - disa_stig_mode == "audit"
+    - disa_stig_provider == "ansible-lockdown"
+    - disa_stig_audit_fetch_reports
+  failed_when: false

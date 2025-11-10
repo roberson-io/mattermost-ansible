@@ -1,0 +1,88 @@
+---
+# RHEL 9 / Rocky 9 / AlmaLinux 9 STIG tasks
+
+- name: Display RHEL 9 STIG information
+  ansible.builtin.debug:
+    msg: "Applying DISA STIG for RHEL 9 using {{ disa_stig_provider }} provider"
+
+# DISA Official Role (recommended for DoD customers)
+# NOTE: Official DISA STIG role must be installed first using scripts/install-disa-stig-roles.sh
+- name: Check if DISA official RHEL 9 STIG role exists
+  ansible.builtin.stat:
+    path: "{{ playbook_dir }}/roles/rhel9STIG"
+  register: disa_rhel9_role
+  delegate_to: localhost
+  become: false
+  run_once: true
+  when: disa_stig_provider == "disa-official"
+
+- name: Fail if DISA official role not found
+  ansible.builtin.fail:
+    msg: >-
+      Official DISA RHEL 9 STIG role not found. Please run: scripts/install-disa-stig-roles.sh
+      This script will download and extract official DISA STIG roles from dl.dod.cyber.mil
+  when:
+    - disa_stig_provider == "disa-official"
+    - not disa_rhel9_role.stat.exists
+
+- name: Apply RHEL 9 STIG using official DISA role
+  ansible.builtin.include_role:
+    name: rhel9STIG
+  when:
+    - disa_stig_provider == "disa-official"
+    - disa_rhel9_role.stat.exists
+
+# Note: The official DISA STIG role uses a callback plugin (stig_xml) that generates
+# a single consolidated XCCDF report on the control machine (not per-host reports on VMs).
+# The report is automatically fetched by post_tasks in site.yml from the control machine's
+# temp directory. Per-host XML_PATH environment variables and VM-based report fetching
+# are not supported by the callback plugin architecture.
+
+# RedHat Official (ComplianceAsCode generated)
+- name: Verify RedHat Official STIG role is available
+  ansible.builtin.fail:
+    msg: >-
+      STIG role not found. Please install: ansible-galaxy install {{ disa_stig_playbooks.rhel9.redhat_official }}
+  when:
+    - disa_stig_provider == "redhat-official"
+    - lookup('first_found', dict(files=['~/.ansible/roles/RedHatOfficial.rhel9_stig', '/etc/ansible/roles/RedHatOfficial.rhel9_stig'], skip=true)) == ''
+  failed_when: false
+
+- name: Apply RHEL 9 STIG using RedHat Official
+  ansible.builtin.include_role:
+    name: "RedHatOfficial.rhel9_stig"
+  when: disa_stig_provider == "redhat-official"
+
+# Community ansible-lockdown (fallback)
+- name: Verify ansible-lockdown STIG role is available
+  ansible.builtin.fail:
+    msg: >-
+      STIG role not found. Please install: ansible-galaxy install {{ disa_stig_playbooks.rhel9.ansible_lockdown }}
+  when:
+    - disa_stig_provider == "ansible-lockdown"
+    - lookup('first_found', dict(files=['~/.ansible/roles/ansible-lockdown.RHEL9-STIG', '/etc/ansible/roles/ansible-lockdown.RHEL9-STIG'], skip=true)) == ''
+  failed_when: false
+
+- name: Apply RHEL 9 STIG using ansible-lockdown
+  ansible.builtin.include_role:
+    name: "ansible-lockdown.RHEL9-STIG"
+  vars:
+    rhel9stig_disruption_high: "{{ disa_stig_disruption_high }}"
+    rhel9stig_cat1_patch: "{{ disa_stig_cat_1_patch }}"
+    rhel9stig_cat2_patch: "{{ disa_stig_cat_2_patch }}"
+    rhel9stig_cat3_patch: "{{ disa_stig_cat_3_patch }}"
+    rhel9stig_run_audit: "{{ true if disa_stig_mode == 'audit' else false }}"
+    rhel9stig_audit_format: "{{ disa_stig_goss_format }}"
+    system_is_container: false
+  when: disa_stig_provider == "ansible-lockdown"
+
+- name: Fetch STIG audit reports (ansible-lockdown)
+  ansible.builtin.fetch:
+    src: "/tmp/{{ ansible_hostname }}_stig_audit.{{ disa_stig_goss_format }}"
+    dest: "{{ disa_stig_audit_report_dir }}/{{ ansible_hostname }}_stig_audit.{{ disa_stig_goss_format }}"
+    flat: true
+  when:
+    - disa_stig_mode == "audit"
+    - disa_stig_provider == "ansible-lockdown"
+    - disa_stig_audit_fetch_reports
+  failed_when: false

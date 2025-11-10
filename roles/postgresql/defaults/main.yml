@@ -46,3 +46,7 @@ postgresql_wal_keep_size: "1GB"  # Amount of WAL to retain for replicas (Postgre
 # Replica-specific settings (only used on replica nodes)
 postgresql_hot_standby: "on"  # Allow read queries on replica
 postgresql_hot_standby_feedback: "on"  # Prevent query conflicts on replica
+
+# Firewall configuration
+postgresql_firewall_enabled: true
+postgresql_firewall_allowed_sources: []  # List of IP addresses or CIDR ranges to allow

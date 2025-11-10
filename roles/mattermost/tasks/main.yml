@@ -1,6 +1,17 @@
 ---
 - name: Include OS-specific variables
   ansible.builtin.include_vars: "{{ ansible_os_family }}.yml"
+
+#
+# Set hostname from inventory (required for HA cluster node identification)
+#
+- name: Set system hostname from inventory
+  ansible.builtin.hostname:
+    name: "{{ inventory_hostname }}"
+  when:
+    - mattermost_enable_cluster | default(false)
+    - inventory_hostname != ansible_hostname
+
 - name: Update apt cache (Debian/Ubuntu)
   ansible.builtin.apt:
     update_cache: true
@@ -208,6 +219,76 @@
     owner: mattermost
     group: mattermost
     recurse: true
+
+# SELinux configuration (per Mattermost documentation)
+- name: Set SELinux file context policy for Mattermost directory
+  community.general.sefcontext:
+    target: "{{ mattermost_install_path }}(/.*)?"
+    setype: httpd_sys_content_t
+    state: present
+  when:
+    - ansible_os_family == "RedHat"
+    - ansible_selinux.status == "enabled"
+
+- name: Set SELinux file context policy for Mattermost binaries
+  community.general.sefcontext:
+    target: "{{ mattermost_install_path }}/bin(/.*)?"
+    setype: bin_t
+    state: present
+  when:
+    - ansible_os_family == "RedHat"
+    - ansible_selinux.status == "enabled"
+
+- name: Set SELinux file context policy for Mattermost config directory
+  community.general.sefcontext:
+    target: "{{ mattermost_install_path }}/config(/.*)?"
+    setype: etc_t
+    state: present
+  when:
+    - ansible_os_family == "RedHat"
+    - ansible_selinux.status == "enabled"
+
+- name: Apply SELinux context to Mattermost installation
+  ansible.builtin.command:
+    cmd: restorecon -RF {{ mattermost_install_path }}
+  changed_when: false
+  when:
+    - ansible_os_family == "RedHat"
+    - ansible_selinux.status == "enabled"
+
+#
+# fapolicyd configuration (RHEL 8+)
+#
+- name: Check if fapolicyd is installed
+  ansible.builtin.stat:
+    path: /usr/sbin/fapolicyd
+  register: mattermost_fapolicyd_binary
+
+- name: Get list of all plugin binaries
+  ansible.builtin.find:
+    paths: "{{ mattermost_install_path }}/plugins"
+    patterns: "plugin-linux-*"
+    recurse: true
+    file_type: file
+  register: mattermost_plugin_binaries
+  when:
+    - ansible_os_family == "RedHat"
+    - mattermost_fapolicyd_binary.stat.exists
+
+- name: Add Mattermost binaries to fapolicyd trust database
+  ansible.builtin.shell:
+    cmd: |
+      fapolicyd-cli --file add {{ mattermost_install_path }}/bin/mattermost
+      fapolicyd-cli --file add {{ mattermost_install_path }}/bin/mmctl
+      {% for plugin in mattermost_plugin_binaries.files | default([]) %}
+      fapolicyd-cli --file add {{ plugin.path }}
+      {% endfor %}
+      fapolicyd-cli --update
+  changed_when: true
+  when:
+    - ansible_os_family == "RedHat"
+    - mattermost_fapolicyd_binary.stat.exists
+  notify: Restart mattermost
 
 #
 # System limits configuration for HA cluster (optional)
@@ -584,6 +665,16 @@
     - mattermost_license_file | length > 0
     - mattermost_config_storage == "database"
 
+- name: Check if license is already installed
+  ansible.builtin.uri:
+    url: "http://localhost:8065/api/v4/license/client?format=old"
+    method: GET
+    return_content: true
+  register: mattermost_license_check
+  changed_when: false
+  failed_when: false
+  when: mattermost_license_file | length > 0
+
 - name: Copy license file to server
   ansible.builtin.copy:
     src: "{{ mattermost_license_file }}"
@@ -591,7 +682,9 @@
     owner: mattermost
     group: mattermost
     mode: "0600"
-  when: mattermost_license_file | length > 0
+  when:
+    - mattermost_license_file | length > 0
+    - mattermost_license_check.status != 200 or (mattermost_license_check.json.IsLicensed | default('false')) == 'false'
 
 - name: Upload license using mmctl
   ansible.builtin.command:
@@ -601,29 +694,26 @@
   become: true
   become_user: mattermost
   register: mattermost_license_upload
-  changed_when: "'License uploaded successfully' in mattermost_license_upload.stdout or mattermost_license_upload.rc == 0"
+  changed_when: "'uploaded' in mattermost_license_upload.stdout.lower()"
   failed_when: false
-  when: mattermost_license_file | length > 0
+  when:
+    - mattermost_license_file | length > 0
+    - mattermost_license_check.status != 200 or (mattermost_license_check.json.IsLicensed | default('false')) == 'false'
 
 - name: Remove temporary license file
   ansible.builtin.file:
     path: "/tmp/mattermost.license"
     state: absent
-  when: mattermost_license_file | length > 0
-
-- name: Get license status
-  ansible.builtin.command:
-    cmd: "{{ mattermost_install_path }}/bin/mmctl --local system status"
-  become: true
-  become_user: mattermost
-  register: mattermost_license_status
-  changed_when: false
-  failed_when: false
-  when: mattermost_license_file | length > 0
+  when:
+    - mattermost_license_file | length > 0
+    - mattermost_license_check.status != 200 or (mattermost_license_check.json.IsLicensed | default('false')) == 'false'
 
 - name: Display license information
   ansible.builtin.debug:
-    msg: "License upload result: {{ mattermost_license_upload.stdout | default('No license uploaded') }}"
+    msg: >-
+      {{ 'License already installed' if (mattermost_license_check.status == 200 and
+      (mattermost_license_check.json.IsLicensed | default('false')) == 'true') else
+      'License uploaded: ' + (mattermost_license_upload.stdout | default('No license uploaded')) }}
   when: mattermost_license_file | length > 0
 
 #
@@ -631,6 +721,17 @@
 #
 
 # Disable Redis if mattermost_enable_redis is false
+- name: Check current cache type
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config get CacheSettings.CacheType
+  become: true
+  become_user: mattermost
+  register: mattermost_current_cache_type
+  changed_when: false
+  failed_when: false
+  when: not (mattermost_enable_redis | default(false))
+
 - name: Revert to LRU cache when Redis is disabled
   ansible.builtin.command:
     cmd: >
@@ -638,7 +739,10 @@
   become: true
   become_user: mattermost
   changed_when: true
-  when: not (mattermost_enable_redis | default(false))
+  register: mattermost_redis_disabled
+  when:
+    - not (mattermost_enable_redis | default(false))
+    - "'lru' not in mattermost_current_cache_type.stdout | lower"
 
 - name: Clear Redis address when Redis is disabled
   ansible.builtin.command:
@@ -647,7 +751,9 @@
   become: true
   become_user: mattermost
   changed_when: true
-  when: not (mattermost_enable_redis | default(false))
+  when:
+    - not (mattermost_enable_redis | default(false))
+    - mattermost_redis_disabled is changed
 
 - name: Clear Redis password when Redis is disabled
   ansible.builtin.command:
@@ -656,7 +762,9 @@
   become: true
   become_user: mattermost
   changed_when: true
-  when: not (mattermost_enable_redis | default(false))
+  when:
+    - not (mattermost_enable_redis | default(false))
+    - mattermost_redis_disabled is changed
   no_log: true
 
 - name: Restart Mattermost to apply cache type change
@@ -664,7 +772,9 @@
     name: mattermost
     state: restarted
   become: true
-  when: not (mattermost_enable_redis | default(false))
+  when:
+    - not (mattermost_enable_redis | default(false))
+    - mattermost_redis_disabled is changed
 
 - name: Wait for Mattermost to be ready after disabling Redis
   ansible.builtin.uri:
@@ -753,6 +863,17 @@
 #
 # S3/MinIO storage configuration (optional)
 #
+- name: Check current storage driver
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config get FileSettings.DriverName
+  become: true
+  become_user: mattermost
+  register: mattermost_current_driver
+  changed_when: false
+  failed_when: false
+  when: mattermost_enable_s3 | default(false)
+
 - name: Configure S3 storage driver
   ansible.builtin.command:
     cmd: >
@@ -760,7 +881,10 @@
   become: true
   become_user: mattermost
   changed_when: true
-  when: mattermost_enable_s3 | default(false)
+  register: mattermost_s3_driver_changed
+  when:
+    - mattermost_enable_s3 | default(false)
+    - "'amazons3' not in mattermost_current_driver.stdout | lower"
 
 - name: Configure S3 endpoint
   ansible.builtin.command:
@@ -769,7 +893,9 @@
   become: true
   become_user: mattermost
   changed_when: true
-  when: mattermost_enable_s3 | default(false)
+  when:
+    - mattermost_enable_s3 | default(false)
+    - mattermost_s3_driver_changed is changed
 
 - name: Configure S3 bucket
   ansible.builtin.command:
@@ -778,7 +904,9 @@
   become: true
   become_user: mattermost
   changed_when: true
-  when: mattermost_enable_s3 | default(false)
+  when:
+    - mattermost_enable_s3 | default(false)
+    - mattermost_s3_driver_changed is changed
 
 - name: Configure S3 region
   ansible.builtin.command:
@@ -787,7 +915,9 @@
   become: true
   become_user: mattermost
   changed_when: true
-  when: mattermost_enable_s3 | default(false)
+  when:
+    - mattermost_enable_s3 | default(false)
+    - mattermost_s3_driver_changed is changed
 
 - name: Configure S3 access key ID
   ansible.builtin.command:
@@ -796,7 +926,9 @@
   become: true
   become_user: mattermost
   changed_when: true
-  when: mattermost_enable_s3 | default(false)
+  when:
+    - mattermost_enable_s3 | default(false)
+    - mattermost_s3_driver_changed is changed
   no_log: true
 
 - name: Configure S3 secret access key
@@ -806,7 +938,9 @@
   become: true
   become_user: mattermost
   changed_when: true
-  when: mattermost_enable_s3 | default(false)
+  when:
+    - mattermost_enable_s3 | default(false)
+    - mattermost_s3_driver_changed is changed
   no_log: true
 
 - name: Configure S3 SSL/TLS
@@ -816,7 +950,9 @@
   become: true
   become_user: mattermost
   changed_when: true
-  when: mattermost_enable_s3 | default(false)
+  when:
+    - mattermost_enable_s3 | default(false)
+    - mattermost_s3_driver_changed is changed
 
 - name: Configure S3 path prefix
   ansible.builtin.command:
@@ -828,13 +964,16 @@
   when:
     - mattermost_enable_s3 | default(false)
     - mattermost_s3_path_prefix | default('') | length > 0
+    - mattermost_s3_driver_changed is changed
 
 - name: Restart Mattermost to apply S3 configuration
   ansible.builtin.systemd:
     name: mattermost
     state: restarted
   become: true
-  when: mattermost_enable_s3 | default(false)
+  when:
+    - mattermost_enable_s3 | default(false)
+    - mattermost_s3_driver_changed is changed
 
 - name: Wait for Mattermost to be ready after S3 config
   ansible.builtin.uri:
@@ -1052,13 +1191,14 @@
   changed_when: true
   when: mattermost_enable_boards | default(false)
 
-- name: Check if Boards plugin is already installed
+- name: Check if Boards plugin is already installed (cluster-wide check)
   ansible.builtin.stat:
     path: "{{ mattermost_install_path }}/plugins/focalboard"
   register: mattermost_boards_plugin_installed
+  run_once: true
   when: mattermost_enable_boards | default(false)
 
-- name: Get current Boards plugin version
+- name: Get current Boards plugin version (cluster-wide check)
   ansible.builtin.shell:
     cmd: |
       set -o pipefail
@@ -1069,11 +1209,12 @@
   register: mattermost_boards_current_version
   changed_when: false
   failed_when: false
+  run_once: true
   when:
     - mattermost_enable_boards | default(false)
     - mattermost_boards_plugin_installed.stat.exists
 
-- name: Set Boards plugin version facts
+- name: Set Boards plugin version facts (cluster-wide)
   ansible.builtin.set_fact:
     mattermost_mattermost_boards_installed_version: >-
       {{ mattermost_boards_current_version.stdout | default('none') }}
@@ -1082,6 +1223,7 @@
       mattermost_boards_current_version.stdout != mattermost_boards_version }}
     mattermost_boards_needs_install: >-
       {{ not mattermost_boards_plugin_installed.stat.exists }}
+  run_once: true
   when: mattermost_enable_boards | default(false)
 
 - name: Display Boards plugin version information
@@ -1105,6 +1247,7 @@
   register: mattermost_boards_remove
   changed_when: mattermost_boards_remove.rc == 0
   failed_when: false
+  run_once: true
   when:
     - mattermost_enable_boards | default(false)
     - mattermost_boards_needs_upgrade | default(false)
@@ -1125,6 +1268,7 @@
     dest: "/tmp/mattermost-plugin-boards-v{{ mattermost_boards_version }}.tar.gz"
     mode: "0644"
     timeout: 120
+  run_once: true
   when:
     - mattermost_enable_boards | default(false)
     - mattermost_boards_needs_install | default(false) or mattermost_boards_needs_upgrade | default(false)
@@ -1139,6 +1283,7 @@
   register: mattermost_boards_install
   changed_when: "'Uploaded' in mattermost_boards_install.stdout or mattermost_boards_install.rc == 0"
   failed_when: mattermost_boards_install.rc != 0 and 'already exists' not in mattermost_boards_install.stderr
+  run_once: true
   when:
     - mattermost_enable_boards | default(false)
     - mattermost_boards_needs_install | default(false) or mattermost_boards_needs_upgrade | default(false)
@@ -1217,6 +1362,37 @@
     - mattermost_enable_cluster | default(false)
     - groups.app | default([]) | length > 1
 
+- name: Get current cluster configuration
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      MMCTL="{{ mattermost_install_path }}/bin/mmctl --local config get"
+      echo "Enable=$($MMCTL ClusterSettings.Enable 2>/dev/null | grep -oP '(?<=: )\w+' || echo 'false')"
+      echo "ClusterName=$($MMCTL ClusterSettings.ClusterName 2>/dev/null | grep -oP '(?<=: ).*' || echo '')"
+      echo "UseIPAddress=$($MMCTL ClusterSettings.UseIPAddress 2>/dev/null | grep -oP '(?<=: )\w+' || echo 'true')"
+      echo "GossipPort=$($MMCTL ClusterSettings.GossipPort 2>/dev/null | grep -oP '(?<=: )\d+' || echo '8074')"
+      echo "ReadOnlyConfig=$($MMCTL ClusterSettings.ReadOnlyConfig 2>/dev/null | grep -oP '(?<=: )\w+' || echo 'true')"
+  args:
+    executable: /bin/bash
+  become: true
+  become_user: mattermost
+  register: mattermost_current_cluster_config
+  changed_when: false
+  failed_when: false
+  run_once: true
+  when: mattermost_enable_cluster | default(false)
+
+- name: Parse current cluster configuration
+  ansible.builtin.set_fact:
+    mattermost_cluster_current:
+      enable: "{{ mattermost_current_cluster_config.stdout_lines | select('match', '^Enable=') | first | regex_replace('^Enable=', '') }}"
+      cluster_name: "{{ mattermost_current_cluster_config.stdout_lines | select('match', '^ClusterName=') | first | regex_replace('^ClusterName=', '') }}"
+      use_ip: "{{ mattermost_current_cluster_config.stdout_lines | select('match', '^UseIPAddress=') | first | regex_replace('^UseIPAddress=', '') }}"
+      gossip_port: "{{ mattermost_current_cluster_config.stdout_lines | select('match', '^GossipPort=') | first | regex_replace('^GossipPort=', '') }}"
+      readonly: "{{ mattermost_current_cluster_config.stdout_lines | select('match', '^ReadOnlyConfig=') | first | regex_replace('^ReadOnlyConfig=', '') }}"
+  run_once: true
+  when: mattermost_enable_cluster | default(false)
+
 - name: Enable cluster mode
   ansible.builtin.command:
     cmd: >
@@ -1224,7 +1400,10 @@
   become: true
   become_user: mattermost
   changed_when: true
-  when: mattermost_enable_cluster | default(false)
+  run_once: true
+  when:
+    - mattermost_enable_cluster | default(false)
+    - mattermost_cluster_current.enable != 'true'
 
 - name: Configure cluster name
   ansible.builtin.command:
@@ -1233,7 +1412,10 @@
   become: true
   become_user: mattermost
   changed_when: true
-  when: mattermost_enable_cluster | default(false)
+  run_once: true
+  when:
+    - mattermost_enable_cluster | default(false)
+    - mattermost_cluster_current.cluster_name != mattermost_cluster_name
 
 - name: Configure cluster to use IP address
   ansible.builtin.command:
@@ -1242,7 +1424,10 @@
   become: true
   become_user: mattermost
   changed_when: true
-  when: mattermost_enable_cluster | default(false)
+  run_once: true
+  when:
+    - mattermost_enable_cluster | default(false)
+    - mattermost_cluster_current.use_ip != (mattermost_cluster_use_ip_address | lower | string)
 
 - name: Configure cluster override hostname
   ansible.builtin.command:
@@ -1251,6 +1436,7 @@
   become: true
   become_user: mattermost
   changed_when: true
+  run_once: true
   when:
     - mattermost_enable_cluster | default(false)
     - mattermost_cluster_override_hostname | default('') | length > 0
@@ -1262,7 +1448,10 @@
   become: true
   become_user: mattermost
   changed_when: true
-  when: mattermost_enable_cluster | default(false)
+  run_once: true
+  when:
+    - mattermost_enable_cluster | default(false)
+    - mattermost_cluster_current.gossip_port != (mattermost_gossip_port | string)
 
 - name: Configure read-only config
   ansible.builtin.command:
@@ -1271,7 +1460,19 @@
   become: true
   become_user: mattermost
   changed_when: true
-  when: mattermost_enable_cluster | default(false)
+  run_once: true
+  when:
+    - mattermost_enable_cluster | default(false)
+    - mattermost_cluster_current.readonly != (mattermost_cluster_read_only_config | lower | string)
+
+- name: Check if firewalld is available
+  ansible.builtin.command: which firewall-cmd
+  register: mattermost_firewalld_check
+  changed_when: false
+  failed_when: false
+  when:
+    - mattermost_enable_cluster | default(false)
+    - ansible_os_family == "RedHat"
 
 - name: Configure firewall for gossip port (firewalld)
   ansible.posix.firewalld:
@@ -1281,8 +1482,8 @@
     immediate: true
   when:
     - mattermost_enable_cluster | default(false)
-    - ansible_facts.services['firewalld.service'] is defined
-    - ansible_facts.services['firewalld.service'].state == 'running'
+    - ansible_os_family == "RedHat"
+    - mattermost_firewalld_check.rc == 0
 
 - name: Configure firewall for streaming port (firewalld)
   ansible.posix.firewalld:
@@ -1292,8 +1493,17 @@
     immediate: true
   when:
     - mattermost_enable_cluster | default(false)
-    - ansible_facts.services['firewalld.service'] is defined
-    - ansible_facts.services['firewalld.service'].state == 'running'
+    - ansible_os_family == "RedHat"
+    - mattermost_firewalld_check.rc == 0
+
+- name: Check if ufw is available
+  ansible.builtin.command: which ufw
+  register: mattermost_ufw_check
+  changed_when: false
+  failed_when: false
+  when:
+    - mattermost_enable_cluster | default(false)
+    - ansible_os_family == "Debian"
 
 - name: Configure firewall for gossip port (ufw)
   community.general.ufw:
@@ -1302,7 +1512,8 @@
     proto: tcp
   when:
     - mattermost_enable_cluster | default(false)
-    - ansible_facts.packages['ufw'] is defined
+    - ansible_os_family == "Debian"
+    - mattermost_ufw_check.rc == 0
 
 - name: Configure firewall for streaming port (ufw)
   community.general.ufw:
@@ -1311,7 +1522,8 @@
     proto: tcp
   when:
     - mattermost_enable_cluster | default(false)
-    - ansible_facts.packages['ufw'] is defined
+    - ansible_os_family == "Debian"
+    - mattermost_ufw_check.rc == 0
 
 - name: Restart Mattermost to apply cluster configuration
   ansible.builtin.systemd:

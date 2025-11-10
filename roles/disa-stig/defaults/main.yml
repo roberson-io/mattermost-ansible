@@ -1,0 +1,106 @@
+---
+# DISA STIG role default variables
+
+# Enable/disable STIG hardening (opt-in, disabled by default)
+disa_stig_enabled: false
+
+# STIG provider: "disa-official" (official DISA playbooks from cyber.mil)
+#                 "redhat-official" (Red Hat role from ComplianceAsCode)
+#                 "ansible-lockdown" (community, broader distro support)
+#
+# RECOMMENDED: "disa-official" for DoD customers (requires manual download from cyber.mil)
+# NOTE: DISA official playbooks must be downloaded from https://cyber.mil/stigs/supplemental-automation-content/
+#       and placed in roles/disa-stig/files/official-playbooks/
+disa_stig_provider: "disa-official"
+
+# STIG mode: "remediate" or "audit"
+# remediate: Apply STIG configuration changes
+# audit: Scan only, generate compliance report (no changes)
+disa_stig_mode: "remediate"
+
+# STIG severity levels (CAT I = critical, CAT II = high, CAT III = medium)
+disa_stig_cat_1_patch: true  # Critical findings
+disa_stig_cat_2_patch: true  # High findings
+disa_stig_cat_3_patch: false  # Medium findings (disabled by default)
+
+# Allow disruptive findings (may impact application functionality)
+# Examples: Disabling USB, removing packages, enforcing SELinux
+disa_stig_disruption_high: false
+
+# Distribution-specific STIG playbook download URLs and mappings
+# disa_official: Official DISA playbook download URL from dl.dod.cyber.mil
+# redhat_official: Red Hat Ansible Galaxy role names
+# ansible_lockdown: Community Ansible Galaxy role names
+disa_stig_playbooks:
+  rhel8:
+    disa_official_url: "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_RHEL_8_V1R14_STIG_Ansible.zip"
+    disa_official_file: "U_RHEL_8_V1R14_STIG_Ansible.zip"
+    redhat_official: "RedHatOfficial.rhel8_stig"
+    ansible_lockdown: "ansible-lockdown.RHEL8-STIG"
+  rhel9:
+    disa_official_url: "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_RHEL_9_V2R5_STIG_Ansible.zip"
+    disa_official_file: "U_RHEL_9_V2R5_STIG_Ansible.zip"
+    redhat_official: "RedHatOfficial.rhel9_stig"
+    ansible_lockdown: "ansible-lockdown.RHEL9-STIG"
+  ubuntu20:
+    disa_official_url: "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_CAN_Ubuntu_20-04_LTS_V1R12_STIG_Ansible.zip"
+    disa_official_file: "U_CAN_Ubuntu_20-04_LTS_V1R12_STIG_Ansible.zip"
+    ansible_lockdown: "ansible-lockdown.UBUNTU20-STIG"
+  ubuntu22:
+    disa_official_url: "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_CAN_Ubuntu_22-04_LTS_V2R5_STIG_Ansible.zip"
+    disa_official_file: "U_CAN_Ubuntu_22-04_LTS_V2R5_STIG_Ansible.zip"
+    ansible_lockdown: "ansible-lockdown.UBUNTU22-STIG"
+  ubuntu24:
+    disa_official_url: ""  # Not yet available from DISA as of 2025
+    ansible_lockdown: "ansible-lockdown.UBUNTU24-STIG"
+
+# Path where official DISA playbooks will be downloaded and extracted
+disa_stig_download_dir: "/tmp/disa-stig-playbooks"
+disa_stig_extract_dir: "{{ disa_stig_download_dir }}/extracted"
+
+# Audit-only mode settings (when disa_stig_mode: audit)
+disa_stig_audit_tool: "goss"  # Audit tool: "goss" (ansible-lockdown) or "oscap" (OpenSCAP)
+disa_stig_audit_report_dir: "/tmp/stig-compliance-reports"
+disa_stig_audit_fetch_reports: true  # Fetch reports to local machine
+
+# OpenSCAP settings (when using oscap audit tool)
+disa_stig_oscap_profile: "stig"  # SCAP profile to scan
+disa_stig_oscap_results_file: "stig-scan-results.xml"
+disa_stig_oscap_report_file: "stig-scan-report.html"
+
+# GOSS settings (when using goss audit tool - ansible-lockdown default)
+disa_stig_goss_version: "0.4.8"
+disa_stig_goss_format: "json"  # Output format: json, junit, tap, nagios
+
+# Exclude specific STIG findings (by vulnerability ID)
+# Example: ["V-230221", "V-230222"]
+disa_stig_exclude_rules: []
+
+# Custom variables passed to underlying STIG roles
+# RHEL-specific variables
+rhel_stig_custom_vars:
+  # Non-disruptive changes only by default
+  rhel9stig_disruption_high: "{{ disa_stig_disruption_high }}"
+  rhel9stig_cat1_patch: "{{ disa_stig_cat_1_patch }}"
+  rhel9stig_cat2_patch: "{{ disa_stig_cat_2_patch }}"
+  rhel9stig_cat3_patch: "{{ disa_stig_cat_3_patch }}"
+  # Audit mode
+  rhel9stig_run_audit: "{{ true if disa_stig_mode == 'audit' else false }}"
+  # Skip rules if specified
+  rhel9stig_skip_rules: "{{ disa_stig_exclude_rules }}"
+
+# Ubuntu-specific variables
+ubuntu_stig_custom_vars:
+  # Non-disruptive changes only by default
+  ubuntu_stig_disruption_high: "{{ disa_stig_disruption_high }}"
+  ubuntu_stig_cat1_patch: "{{ disa_stig_cat_1_patch }}"
+  ubuntu_stig_cat2_patch: "{{ disa_stig_cat_2_patch }}"
+  ubuntu_stig_cat3_patch: "{{ disa_stig_cat_3_patch }}"
+  # Audit mode
+  ubuntu_stig_run_audit: "{{ true if disa_stig_mode == 'audit' else false }}"
+  # Skip rules if specified
+  ubuntu_stig_skip_rules: "{{ disa_stig_exclude_rules }}"
+
+# Pre-hardening backup
+disa_stig_create_backup: true
+disa_stig_backup_dir: "/var/backups/pre-stig-{{ ansible_date_time.epoch }}"

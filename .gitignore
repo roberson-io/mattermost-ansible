@@ -58,3 +58,6 @@ molecule/**/__pycache__/
 
 # Mattermost
 license.mattermost
+
+# AI Context
+CLAUDE.md

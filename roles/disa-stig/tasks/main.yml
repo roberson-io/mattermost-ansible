@@ -1,0 +1,55 @@
+---
+# DISA STIG role main tasks
+
+- name: Check if STIG hardening is enabled
+  ansible.builtin.debug:
+    msg: "DISA STIG hardening is {{ 'enabled' if disa_stig_enabled else 'disabled' }}"
+
+- name: Skip STIG hardening when disabled
+  ansible.builtin.meta: end_host
+  when: not disa_stig_enabled
+
+- name: Display STIG configuration
+  ansible.builtin.debug:
+    msg:
+      - "STIG Provider: {{ disa_stig_provider }}"
+      - "STIG Mode: {{ disa_stig_mode }}"
+      - "CAT I (Critical): {{ disa_stig_cat_1_patch }}"
+      - "CAT II (High): {{ disa_stig_cat_2_patch }}"
+      - "CAT III (Medium): {{ disa_stig_cat_3_patch }}"
+      - "Disruptive Changes: {{ disa_stig_disruption_high }}"
+
+- name: Detect operating system distribution
+  ansible.builtin.set_fact:
+    disa_stig_detected_os: >-
+      {%- if ansible_distribution == "RedHat" or ansible_distribution == "Rocky" or ansible_distribution == "AlmaLinux" -%}
+        {%- if ansible_distribution_major_version == "8" -%}rhel8
+      {%- elif ansible_distribution_major_version == "9" -%}rhel9
+      {%- else -%}unsupported{%- endif -%}
+      {%- elif ansible_distribution == "Ubuntu" -%}
+        {%- if ansible_distribution_version == "20.04" -%}ubuntu20
+      {%- elif ansible_distribution_version == "22.04" -%}ubuntu22
+      {%- elif ansible_distribution_version == "24.04" -%}ubuntu24
+      {%- else -%}unsupported{%- endif -%}
+      {%- else -%}unsupported{%- endif -%}
+
+- name: Display detected OS
+  ansible.builtin.debug:
+    msg: "Detected OS for STIG: {{ disa_stig_detected_os }}"
+
+- name: Fail if unsupported OS
+  ansible.builtin.fail:
+    msg: >-
+      Unsupported OS for STIG hardening: {{ ansible_distribution }} {{ ansible_distribution_version }}.
+      Supported: RHEL/Rocky/AlmaLinux 8/9, Ubuntu 20.04/22.04/24.04
+  when: disa_stig_detected_os == "unsupported"
+
+- name: Create audit report directory
+  ansible.builtin.file:
+    path: "{{ disa_stig_audit_report_dir }}"
+    state: directory
+    mode: "0755"
+  when: disa_stig_mode == "audit"
+
+- name: Include distribution-specific STIG tasks
+  ansible.builtin.include_tasks: "{{ disa_stig_detected_os }}.yml"

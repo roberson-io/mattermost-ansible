@@ -348,7 +348,7 @@
 - name: Configure PostgreSQL hot_standby
   ansible.builtin.lineinfile:
     path: "{{ postgresql_conf_path }}"
-    regexp: "^#?hot_standby"
+    regexp: "^#?\\s*hot_standby\\s*="
     line: "hot_standby = {{ postgresql_hot_standby }}"
     state: present
   notify: Restart postgresql
@@ -356,7 +356,7 @@
 - name: Configure PostgreSQL hot_standby_feedback
   ansible.builtin.lineinfile:
     path: "{{ postgresql_conf_path }}"
-    regexp: "^#?hot_standby_feedback"
+    regexp: "^#?\\s*hot_standby_feedback\\s*="
     line: "hot_standby_feedback = {{ postgresql_hot_standby_feedback }}"
     state: present
   notify: Restart postgresql
@@ -389,6 +389,59 @@
     delay: 2
     timeout: 30
 
+- name: Configure firewall for PostgreSQL
+  when: postgresql_firewall_enabled
+  block:
+    - name: Check if firewalld is available
+      ansible.builtin.systemd:
+        name: firewalld
+      register: postgresql_firewalld_service
+      failed_when: false
+
+    - name: Configure firewalld for PostgreSQL
+      when: postgresql_firewalld_service.status.ActiveState == "active"
+      block:
+        - name: Open PostgreSQL port in firewalld (temporary)
+          ansible.posix.firewalld:
+            port: "5432/tcp"
+            permanent: false
+            state: enabled
+            immediate: true
+
+        - name: Open PostgreSQL port in firewalld (permanent)
+          ansible.posix.firewalld:
+            port: "5432/tcp"
+            permanent: true
+            state: enabled
+
+        - name: Configure rich rules for allowed sources
+          ansible.posix.firewalld:
+            rich_rule: "rule family=ipv4 source address={{ item }} port port=5432 protocol=tcp accept"
+            permanent: true
+            state: enabled
+            immediate: true
+          loop: "{{ postgresql_firewall_allowed_sources }}"
+          when: postgresql_firewall_allowed_sources | length > 0
+
+    - name: Configure ufw for PostgreSQL (Ubuntu/Debian)
+      when: ansible_os_family == "Debian"
+      block:
+        - name: Allow PostgreSQL port in ufw
+          community.general.ufw:
+            rule: allow
+            port: "5432"
+            proto: tcp
+          when: postgresql_firewall_allowed_sources | length == 0
+
+        - name: Allow PostgreSQL port from specific sources
+          community.general.ufw:
+            rule: allow
+            port: "5432"
+            proto: tcp
+            from_ip: "{{ item }}"
+          loop: "{{ postgresql_firewall_allowed_sources }}"
+          when: postgresql_firewall_allowed_sources | length > 0
+
 - name: Create Mattermost database
   become: true
   become_user: postgres
@@ -411,7 +464,7 @@
   become: true
   become_user: postgres
   community.postgresql.postgresql_privs:
-    database: "{{ postgresql_db_name }}"
+    login_db: "{{ postgresql_db_name }}"
     role: "{{ postgresql_db_user }}"
     type: database
     privs: ALL
@@ -421,7 +474,7 @@
   become: true
   become_user: postgres
   community.postgresql.postgresql_privs:
-    database: "{{ postgresql_db_name }}"
+    login_db: "{{ postgresql_db_name }}"
     role: "{{ postgresql_db_user }}"
     type: schema
     objs: public
@@ -459,7 +512,7 @@
   become: true
   become_user: postgres
   community.postgresql.postgresql_privs:
-    database: "{{ keycloak_db_name }}"
+    login_db: "{{ keycloak_db_name }}"
     role: "{{ keycloak_db_user }}"
     type: database
     privs: ALL
@@ -473,7 +526,7 @@
   become: true
   become_user: postgres
   community.postgresql.postgresql_privs:
-    database: "{{ keycloak_db_name }}"
+    login_db: "{{ keycloak_db_name }}"
     role: "{{ keycloak_db_user }}"
     type: schema
     objs: public

@@ -582,12 +582,11 @@ Production deployment includes:
 
 **EPEL Repository**: The certbot role automatically installs the EPEL repository for RedHat-family systems, as certbot is not available in the default repositories.
 
-**SELinux**: If SELinux is enabled (default on RHEL/Rocky), you may need to configure policies for nginx and PostgreSQL. The playbook does not currently modify SELinux settings. To allow nginx to connect to the database:
+**SELinux**: If SELinux is enabled (default on RHEL/Rocky), the playbook automatically configures the necessary SELinux booleans for nginx:
+- `httpd_can_network_connect` - Allows nginx to connect to upstream application servers
+- `httpd_can_network_connect_db` - Allows nginx to connect to database servers (if needed)
 
-```bash
-setsebool -P httpd_can_network_connect_db 1
-setsebool -P httpd_can_network_connect 1
-```
+These settings are applied automatically by the nginx role when SELinux is detected as enabled.
 
 **PostgreSQL Initialization**: On RHEL-family systems, PostgreSQL requires manual initialization on first install. The playbook handles this automatically with `postgresql-setup --initdb`.
 

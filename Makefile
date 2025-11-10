@@ -172,6 +172,16 @@ orb-create-vm-minio-ubuntu: ## Create MinIO VM (Ubuntu)
 	@orb create -a amd64 ubuntu minio-ubuntu || echo "minio-ubuntu may already exist"
 	@echo "✓ MinIO VM created. Add to inventory: [minio] $(USER)@minio-ubuntu@orb"
 
+orb-create-vm-postgresql-rocky: ## Create PostgreSQL VM (Rocky Linux 9)
+	@echo "Creating PostgreSQL VM (Rocky Linux 9)..."
+	@orb create -a amd64 rocky:9 postgresql-rocky || echo "postgresql-rocky may already exist"
+	@echo "✓ PostgreSQL VM created. Add to inventory: [database] $(USER)@postgresql-rocky@orb"
+
+orb-create-vm-postgresql-ubuntu: ## Create PostgreSQL VM (Ubuntu)
+	@echo "Creating PostgreSQL VM (Ubuntu)..."
+	@orb create -a amd64 ubuntu postgresql-ubuntu || echo "postgresql-ubuntu may already exist"
+	@echo "✓ PostgreSQL VM created. Add to inventory: [database] $(USER)@postgresql-ubuntu@orb"
+
 orb-create-vm-redis-rocky: ## Create Redis VM (Rocky Linux 9)
 	@echo "Creating Redis VM (Rocky Linux 9)..."
 	@orb create -a amd64 rocky:9 redis-rocky || echo "redis-rocky may already exist"
@@ -288,9 +298,8 @@ orb-create-vms-all-rocky: orb-create-vms-rocky orb-create-vm-calls-offloader-roc
 
 orb-create-vms-all-ubuntu: orb-create-vms-ubuntu orb-create-vm-calls-offloader-ubuntu orb-create-vm-coturn-ubuntu orb-create-vm-elasticsearch-ubuntu orb-create-vm-keycloak-ubuntu orb-create-vm-minio-ubuntu orb-create-vm-redis-ubuntu orb-create-vm-rtcd-ubuntu ## Create all Ubuntu VMs including optional services
 
-orb-create-vms-rocky: ## Create core Rocky Linux 9 AMD64 VMs (postgresql, mattermost only)
+orb-create-vms-rocky: orb-create-vm-postgresql-rocky ## Create core Rocky Linux 9 AMD64 VMs (postgresql, mattermost only)
 	@echo "Creating core Rocky Linux 9 AMD64 VMs..."
-	@orb create -a amd64 rocky:9 postgresql-rocky || echo "postgresql-rocky may already exist"
 	@orb create -a amd64 rocky:9 mattermost-rocky || echo "mattermost-rocky may already exist"
 	@echo "✓ Core Rocky VMs created"
 	@echo ""
@@ -304,9 +313,8 @@ orb-create-vms-rocky: ## Create core Rocky Linux 9 AMD64 VMs (postgresql, matter
 	@echo "  make orb-create-vm-keycloak-rocky orb-create-vm-minio-rocky orb-create-vm-redis-rocky orb-create-vm-elasticsearch-rocky orb-create-vm-rtcd-rocky"
 	@echo "  make orb-create-vm-ldap1-rocky orb-create-vm-ldap2-rocky ..."
 
-orb-create-vms-ubuntu: ## Create core Ubuntu AMD64 VMs (postgresql, mattermost only)
+orb-create-vms-ubuntu: orb-create-vm-postgresql-ubuntu ## Create core Ubuntu AMD64 VMs (postgresql, mattermost only)
 	@echo "Creating core Ubuntu AMD64 VMs..."
-	@orb create -a amd64 ubuntu postgresql-ubuntu || echo "postgresql-ubuntu may already exist"
 	@orb create -a amd64 ubuntu mattermost-ubuntu || echo "mattermost-ubuntu may already exist"
 	@echo "✓ Core Ubuntu VMs created"
 	@echo ""
@@ -392,6 +400,14 @@ orb-delete-vm-minio-ubuntu: ## Delete MinIO VM (Ubuntu)
 	@orb delete -f minio-ubuntu 2>/dev/null || true
 	@echo "✓ MinIO VM deleted"
 
+orb-delete-vm-postgresql-rocky: ## Delete PostgreSQL VM (Rocky)
+	@orb delete -f postgresql-rocky 2>/dev/null || true
+	@echo "✓ PostgreSQL VM deleted"
+
+orb-delete-vm-postgresql-ubuntu: ## Delete PostgreSQL VM (Ubuntu)
+	@orb delete -f postgresql-ubuntu 2>/dev/null || true
+	@echo "✓ PostgreSQL VM deleted"
+
 orb-delete-vm-redis-rocky: ## Delete Redis VM (Rocky)
 	@orb delete -f redis-rocky 2>/dev/null || true
 	@echo "✓ Redis VM deleted"
@@ -452,14 +468,14 @@ orb-delete-vms-all-rocky: orb-delete-vms-rocky orb-delete-vm-calls-offloader-roc
 
 orb-delete-vms-all-ubuntu: orb-delete-vms-ubuntu orb-delete-vm-calls-offloader-ubuntu orb-delete-vm-coturn-ubuntu orb-delete-vm-elasticsearch-ubuntu orb-delete-vm-keycloak-ubuntu orb-delete-vm-minio-ubuntu orb-delete-vm-redis-ubuntu orb-delete-vm-rtcd-ubuntu ## Delete all Ubuntu VMs including optional services
 
-orb-delete-vms-rocky: ## Delete core Rocky Linux VMs
+orb-delete-vms-rocky: orb-delete-vm-postgresql-rocky ## Delete core Rocky Linux VMs
 	@echo "Deleting core Rocky Linux VMs..."
-	@orb delete -f postgresql-rocky mattermost-rocky 2>/dev/null || true
+	@orb delete -f mattermost-rocky 2>/dev/null || true
 	@echo "✓ Core Rocky VMs deleted"
 
-orb-delete-vms-ubuntu: ## Delete core Ubuntu VMs
+orb-delete-vms-ubuntu: orb-delete-vm-postgresql-ubuntu ## Delete core Ubuntu VMs
 	@echo "Deleting core Ubuntu VMs..."
-	@orb delete -f postgresql-ubuntu mattermost-ubuntu 2>/dev/null || true
+	@orb delete -f mattermost-ubuntu 2>/dev/null || true
 	@echo "✓ Core Ubuntu VMs deleted"
 
 ping-local: ## Test connectivity to local VMs
@@ -634,3 +650,27 @@ vault-view: ## View the encrypted vault file contents
 		exit 1; \
 	fi
 	@$(VENV_ACTIVATE) && ansible-vault view group_vars/all.yml $(VAULT_PASS_ARG)
+
+# DISA STIG targets
+
+stig-install: stig-install-all ## Install all official DISA STIG roles (alias for stig-install-all)
+
+stig-install-all: ## Download and install all official DISA STIG roles from dl.dod.cyber.mil
+	@echo "Installing all official DISA STIG roles..."
+	@$(VENV_ACTIVATE) && python3 scripts/install_disa_stig_roles.py all
+
+stig-install-rhel8: ## Download and install RHEL 8 official DISA STIG role
+	@echo "Installing RHEL 8 official DISA STIG role..."
+	@$(VENV_ACTIVATE) && python3 scripts/install_disa_stig_roles.py rhel8
+
+stig-install-rhel9: ## Download and install RHEL 9 official DISA STIG role
+	@echo "Installing RHEL 9 official DISA STIG role..."
+	@$(VENV_ACTIVATE) && python3 scripts/install_disa_stig_roles.py rhel9
+
+stig-install-ubuntu20: ## Download and install Ubuntu 20.04 official DISA STIG role
+	@echo "Installing Ubuntu 20.04 official DISA STIG role..."
+	@$(VENV_ACTIVATE) && python3 scripts/install_disa_stig_roles.py ubuntu20
+
+stig-install-ubuntu22: ## Download and install Ubuntu 22.04 official DISA STIG role
+	@echo "Installing Ubuntu 22.04 official DISA STIG role..."
+	@$(VENV_ACTIVATE) && python3 scripts/install_disa_stig_roles.py ubuntu22

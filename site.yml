@@ -108,6 +108,55 @@
             (ansible_os_family == "RedHat" and (chronyd_status.status.ActiveState | default('inactive')) != 'active') or
             (ansible_os_family == "Debian" and (timesyncd_status.status.ActiveState | default('inactive')) != 'active')
 
+        - name: Force time synchronization before deployment (RedHat/Rocky)
+          ansible.builtin.command: chronyc makestep
+          become: true
+          changed_when: false
+          when: ansible_os_family == "RedHat" and (chronyd_status.status.ActiveState | default('inactive')) == 'active'
+
+        - name: Force time synchronization before deployment (Debian/Ubuntu)
+          ansible.builtin.command: systemctl restart systemd-timesyncd
+          become: true
+          changed_when: false
+          when: ansible_os_family == "Debian" and (timesyncd_status.status.ActiveState | default('inactive')) == 'active'
+
+        - name: Wait for time to stabilize after sync
+          ansible.builtin.pause:
+            seconds: 2
+
+        - name: Get current time on all nodes
+          ansible.builtin.command: date +%s
+          register: node_time
+          changed_when: false
+
+        - name: Set node time fact
+          ansible.builtin.set_fact:
+            my_node_time: "{{ node_time.stdout | int }}"
+
+        - name: Collect all node times
+          ansible.builtin.set_fact:
+            all_node_times: "{{ ansible_play_hosts | map('extract', hostvars, 'my_node_time') | list }}"
+          run_once: true
+
+        - name: Calculate maximum time difference
+          ansible.builtin.set_fact:
+            max_time_diff: "{{ (all_node_times | map('int') | max) - (all_node_times | map('int') | min) }}"
+          run_once: true
+
+        - name: Fail if clock skew is too large
+          ansible.builtin.fail:
+            msg: >-
+              CRITICAL: Clock skew detected! Maximum time difference between nodes is {{ max_time_diff }} seconds.
+              S3/MinIO requires clocks to be synchronized within a few minutes.
+              Please ensure chronyd/NTP is working correctly on all nodes.
+          when: max_time_diff | int > 300
+          run_once: true
+
+        - name: Display time synchronization status
+          ansible.builtin.debug:
+            msg: "✓ Time synchronization OK - maximum clock skew is {{ max_time_diff }} seconds"
+          run_once: true
+
     - name: Gather facts from database host
       ansible.builtin.setup:
       delegate_to: "{{ groups['database'][0] }}"
@@ -381,3 +430,49 @@
             if (enable_monitoring | default(false) and groups['monitoring'] is defined and groups['monitoring'] | length > 0)
             else 'Not configured' }}
           - "Create your admin account on first visit"
+
+- name: Apply DISA STIG Security Hardening (Audit)
+  hosts: all
+  become: true
+  gather_facts: true
+  roles:
+    - role: disa-stig
+      when: disa_stig_enabled | default(false)
+
+  post_tasks:
+    - name: Find XCCDF report in temp directory
+      ansible.builtin.find:
+        paths: "/var/folders"
+        patterns: "xccdf-results.xml"
+        recurse: true
+        file_type: file
+        age: "-10m"
+      register: xccdf_files
+      delegate_to: localhost
+      become: false
+      run_once: true
+      when: disa_stig_enabled | default(false)
+      failed_when: false
+
+    - name: Copy XCCDF report from temp to compliance-reports (runs on localhost)
+      ansible.builtin.copy:
+        src: "{{ xccdf_files.files[0].path }}"
+        dest: >-
+          {{ playbook_dir }}/compliance-reports/{{ deployment_environment | default('deployment') }}_{{
+          disa_stig_provider | default('stig') }}_audit_{{ ansible_date_time.date }}.xml
+        mode: "0644"
+      delegate_to: localhost
+      become: false
+      run_once: true
+      when:
+        - disa_stig_enabled | default(false)
+        - xccdf_files.files | default([]) | length > 0
+      failed_when: false
+
+    - name: Display STIG report location
+      ansible.builtin.debug:
+        msg: >-
+          STIG compliance report saved to: compliance-reports/{{ deployment_environment | default('deployment') }}_{{
+          disa_stig_provider | default('stig') }}_audit_{{ ansible_date_time.date }}.xml
+      run_once: true
+      when: disa_stig_enabled | default(false)

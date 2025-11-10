@@ -1,0 +1,25 @@
+---
+galaxy_info:
+  role_name: disa_stig
+  author: Mattermost
+  description: Apply DISA STIG security hardening for multiple Linux distributions
+  license: ""
+  min_ansible_version: "2.9"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+        - noble
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+  galaxy_tags:
+    - stig
+    - security
+    - hardening
+    - compliance
+    - disa
+
+dependencies: []

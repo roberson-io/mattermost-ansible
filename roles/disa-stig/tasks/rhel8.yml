@@ -1,0 +1,81 @@
+---
+# RHEL 8 / Rocky 8 / AlmaLinux 8 STIG tasks
+
+- name: Display RHEL 8 STIG information
+  ansible.builtin.debug:
+    msg: "Applying DISA STIG for RHEL 8 using {{ disa_stig_provider }} provider"
+
+# DISA Official Playbooks (recommended for DoD customers)
+- name: Create DISA STIG download directory
+  ansible.builtin.file:
+    path: "{{ disa_stig_download_dir }}"
+    state: directory
+    mode: "0755"
+  when: disa_stig_provider == "disa-official"
+
+- name: Create DISA STIG extraction directory
+  ansible.builtin.file:
+    path: "{{ disa_stig_extract_dir }}"
+    state: directory
+    mode: "0755"
+  when: disa_stig_provider == "disa-official"
+
+- name: Install unzip utility (RedHat/Rocky)
+  ansible.builtin.package:
+    name: unzip
+    state: present
+  when:
+    - disa_stig_provider == "disa-official"
+    - ansible_os_family == "RedHat"
+
+- name: Download DISA official RHEL 8 STIG playbook
+  ansible.builtin.get_url:
+    url: "{{ disa_stig_playbooks.rhel8.disa_official_url }}"
+    dest: "{{ disa_stig_download_dir }}/{{ disa_stig_playbooks.rhel8.disa_official_file }}"
+    mode: "0644"
+    timeout: 300
+  when: disa_stig_provider == "disa-official"
+
+- name: Extract DISA official RHEL 8 STIG playbook
+  ansible.builtin.unarchive:
+    src: "{{ disa_stig_download_dir }}/{{ disa_stig_playbooks.rhel8.disa_official_file }}"
+    dest: "{{ disa_stig_extract_dir }}"
+    remote_src: true
+    creates: "{{ disa_stig_extract_dir }}/rhel-8-stig-ansible-hardening.yml"
+  when: disa_stig_provider == "disa-official"
+
+- name: Apply RHEL 8 STIG using official DISA playbook
+  ansible.builtin.include_tasks:
+    file: "{{ disa_stig_extract_dir }}/rhel-8-stig-ansible-hardening.yml"
+  when: disa_stig_provider == "disa-official"
+
+# RedHat Official (ComplianceAsCode generated)
+- name: Apply RHEL 8 STIG using RedHat Official
+  ansible.builtin.include_role:
+    name: "RedHatOfficial.rhel8_stig"
+  when: disa_stig_provider == "redhat-official"
+
+# Community ansible-lockdown (fallback)
+- name: Apply RHEL 8 STIG using ansible-lockdown
+  ansible.builtin.include_role:
+    name: "ansible-lockdown.RHEL8-STIG"
+  vars:
+    rhel8stig_disruption_high: "{{ disa_stig_disruption_high }}"
+    rhel8stig_cat1_patch: "{{ disa_stig_cat_1_patch }}"
+    rhel8stig_cat2_patch: "{{ disa_stig_cat_2_patch }}"
+    rhel8stig_cat3_patch: "{{ disa_stig_cat_3_patch }}"
+    rhel8stig_run_audit: "{{ true if disa_stig_mode == 'audit' else false }}"
+    rhel8stig_audit_format: "{{ disa_stig_goss_format }}"
+    system_is_container: false
+  when: disa_stig_provider == "ansible-lockdown"
+
+- name: Fetch STIG audit reports
+  ansible.builtin.fetch:
+    src: "/tmp/{{ ansible_hostname }}_stig_audit.{{ disa_stig_goss_format }}"
+    dest: "{{ disa_stig_audit_report_dir }}/{{ ansible_hostname }}_stig_audit.{{ disa_stig_goss_format }}"
+    flat: true
+  when:
+    - disa_stig_mode == "audit"
+    - disa_stig_provider == "ansible-lockdown"
+    - disa_stig_audit_fetch_reports
+  failed_when: false

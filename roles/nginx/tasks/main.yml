@@ -96,6 +96,22 @@
     - nginx_ssl_enabled
     - nginx_firewalld_check.rc == 0
 
+- name: Configure SELinux to allow nginx network connections (RedHat)
+  ansible.builtin.command:
+    cmd: setsebool -P httpd_can_network_connect 1
+  changed_when: false
+  when:
+    - ansible_os_family == "RedHat"
+    - ansible_selinux.status == "enabled"
+
+- name: Configure SELinux to allow nginx database connections (RedHat)
+  ansible.builtin.command:
+    cmd: setsebool -P httpd_can_network_connect_db 1
+  changed_when: false
+  when:
+    - ansible_os_family == "RedHat"
+    - ansible_selinux.status == "enabled"
+
 - name: Enable nginx
   ansible.builtin.systemd:
     name: "{{ nginx_service_name }}"

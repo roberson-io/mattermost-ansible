@@ -1,0 +1,42 @@
+- name: dconf_update
+  command: dconf update
+- name: auditd_restart
+  command: /usr/sbin/service auditd restart
+- name: ssh_restart
+  service:
+    name: sshd
+    state: restarted
+- name: rsyslog_restart
+  service:
+    name: rsyslog
+    state: restarted
+- name: sysctl_load_settings
+  command: sysctl --system
+- name: daemon_reload
+  systemd:
+    daemon_reload: true
+- name: networkmanager_reload
+  service:
+    name: NetworkManager
+    state: reloaded
+- name: logind_restart
+  service:
+    name: systemd-logind
+    state: restarted
+- name: with_faillock_enable
+  block:
+    - name: Check if authselect profile is selected
+      command: authselect current
+      register: authselect_current
+      failed_when: false
+      changed_when: false
+
+    - name: Select default authselect profile if none exists
+      command: authselect select sssd --force
+      when: authselect_current.rc != 0
+
+    - name: Enable faillock feature
+      command: authselect enable-feature with-faillock
+- name: do_reboot
+  reboot:
+    pre_reboot_delay: 60

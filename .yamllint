@@ -18,3 +18,9 @@ ignore: |
   venv/
   .ansible/
   .git/
+  roles/rhel9STIG/
+  roles/rhel8STIG/
+  roles/ubuntu20STIG/
+  roles/ubuntu22STIG/
+  roles/ubuntu24STIG/
+  *.example
