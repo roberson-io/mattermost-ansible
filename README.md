@@ -7,7 +7,7 @@ Role-based Ansible playbooks to deploy Mattermost for local development, staging
 - **Multi-distribution support**: Works with Ubuntu, Debian, RHEL, Rocky Linux, CentOS, and Oracle Linux
 - **Multi-environment support**: Separate configurations for local, staging, and production
 - **Role-based architecture**: Modular, reusable components
-- **Production-ready**: Includes nginx reverse proxy and Let's Encrypt SSL/TLS
+- **TLS**: Includes nginx reverse proxy and Let's Encrypt SSL/TLS
 - **Separate database tier**: PostgreSQL on dedicated host
 - **Optional Mattermost Calls**: Real-time voice/video with dedicated rtcd service
 - **Optional Mattermost Boards**: Project management and kanban boards plugin
