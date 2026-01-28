@@ -1,6 +1,6 @@
 # Mattermost Ansible Deployment
 
-Role-based Ansible playbooks to deploy Mattermost for local development, staging, and production environments.
+Role-based Ansible playbooks to deploy Mattermost for local development, staging, and production environments. This project is still in development and is not officially supported by Mattermost.
 
 ## Features
 
