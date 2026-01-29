@@ -1,0 +1,17 @@
+---
+- name: Reload NFS exports
+  ansible.builtin.command: exportfs -ra
+  listen: "reload nfs exports"
+
+- name: Restart NFS server
+  ansible.builtin.systemd:
+    name: "{{ nfs_server_service }}"
+    state: restarted
+    daemon_reload: true
+  listen: "restart nfs"
+
+- name: Restart rpcbind
+  ansible.builtin.systemd:
+    name: "{{ nfs_rpcbind_service }}"
+    state: restarted
+  listen: "restart rpcbind"

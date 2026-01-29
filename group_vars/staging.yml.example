@@ -99,6 +99,21 @@ certbot_create_if_missing: true
 # minio_root_user: "{{ vault_staging_minio_access_key }}"
 # minio_root_password: "{{ vault_staging_minio_secret_key }}"
 
+# NFS Shared File Storage configuration (optional)
+# Alternative to MinIO/S3 for HA deployments that cannot use object storage
+# See: https://docs.mattermost.com/deployment-guide/server/preparations.html#network-file-storage
+# Enable NFS by setting enable_nfs to true and configuring an nfs host in inventory
+# enable_nfs: true
+# mattermost_enable_nfs: true
+# mattermost_nfs_export_path: "/srv/nfs/mattermost"  # Path on NFS server
+# mattermost_nfs_mount_point: "/mnt/mattermost-data"  # Local mount point
+# mattermost_nfs_mount_options: "rw,sync,hard,intr,nfsvers=4.1"
+# Storage sizing guidance (from Mattermost docs):
+# - Low usage teams: 1-5 MB/user/month
+# - Medium usage teams: 5-25 MB/user/month
+# - High usage teams: 25-100 MB/user/month
+# Formula: users * MB_per_month * 12 months * 2x safety factor
+
 # Keycloak Identity Provider configuration (optional)
 # Enable Keycloak by setting enable_keycloak to true and configuring a keycloak host in inventory
 # enable_keycloak: true

@@ -1,0 +1,45 @@
+---
+# NFS Server defaults
+
+# NFS version (4 or 4.1 recommended for performance and security)
+nfs_version: "4.1"
+
+# Base path for NFS exports
+nfs_export_base_path: /srv/nfs
+
+# Mattermost-specific export
+nfs_mattermost_export_path: "{{ nfs_export_base_path }}/mattermost"
+
+# Export options for Mattermost data share
+# rw: read-write access
+# sync: write changes to disk before replying (safer, slower)
+# no_subtree_check: disable subtree checking (better performance)
+# no_root_squash: allow root access from clients (required for Mattermost service)
+nfs_export_options: "rw,sync,no_subtree_check,no_root_squash"
+
+# Allowed clients (CIDR notation or hostnames)
+# Leave empty to allow all hosts in the app group
+nfs_allowed_clients: []
+
+# Firewall configuration
+nfs_firewall_enabled: true
+
+# NFS ports (standard ports for NFSv4)
+nfs_port: 2049
+nfs_mountd_port: 20048
+nfs_rpcbind_port: 111
+
+# Storage sizing guidance (from Mattermost docs)
+# Low usage: 1-5 MB/user/month
+# Medium usage: 5-25 MB/user/month
+# High usage: 25-100 MB/user/month
+# Formula: users * MB_per_month * 12 * safety_factor (2x recommended)
+#
+# Example for 15000 users, medium usage:
+# Min: 15000 * 5 * 12 * 2 = 1.8 TB/year
+# Max: 15000 * 25 * 12 * 2 = 9 TB/year
+
+# Owner/group for exported directories
+nfs_owner: nobody
+nfs_group: "{{ 'nogroup' if ansible_os_family == 'Debian' else 'nobody' }}"
+nfs_mode: "0755"

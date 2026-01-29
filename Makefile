@@ -1,4 +1,4 @@
-.PHONY: help ci clean clean-all deploy-local deploy-local-check deploy-production deploy-production-check deploy-staging deploy-staging-check install lint lint-fix orb-create-vm-calls-offloader-rocky orb-create-vm-calls-offloader-ubuntu orb-create-vm-coturn-rocky orb-create-vm-coturn-ubuntu orb-create-vm-loadbalancer-rocky orb-create-vm-loadbalancer-ubuntu orb-create-vm-monitoring-rocky orb-create-vm-monitoring-ubuntu orb-create-vms orb-create-vms-ha-cluster-rocky orb-create-vms-ha-cluster-ubuntu orb-create-vms-rocky orb-create-vms-ubuntu orb-delete-vm-calls-offloader-rocky orb-delete-vm-calls-offloader-ubuntu orb-delete-vm-coturn-rocky orb-delete-vm-coturn-ubuntu orb-delete-vm-loadbalancer-rocky orb-delete-vm-loadbalancer-ubuntu orb-delete-vm-monitoring-rocky orb-delete-vm-monitoring-ubuntu orb-delete-vms orb-delete-vms-ha-cluster-rocky orb-delete-vms-ha-cluster-ubuntu orb-delete-vms-rocky orb-delete-vms-ubuntu ping-local ping-production ping-staging safety-check setup syntax-check test test-all test-certbot test-integration test-integration-check-vms test-integration-db-config test-mattermost test-mattermost-boards test-mattermost-calls test-mattermost-db-config test-mattermost-migrate-to-db test-mattermost-rocky test-nginx test-nginx-rocky test-postgresql test-postgresql-rocky test-rocky test-rtcd test-ubuntu test-unit vault-create vault-create-secure vault-decrypt vault-edit vault-encrypt vault-rekey vault-view
+.PHONY: help ci clean clean-all deploy-local deploy-local-check deploy-production deploy-production-check deploy-staging deploy-staging-check install lint lint-fix orb-create-vm-calls-offloader-rocky orb-create-vm-calls-offloader-ubuntu orb-create-vm-coturn-rocky orb-create-vm-coturn-ubuntu orb-create-vm-loadbalancer-rocky orb-create-vm-loadbalancer-ubuntu orb-create-vm-monitoring-rocky orb-create-vm-monitoring-ubuntu orb-create-vm-nfs-rocky orb-create-vm-nfs-ubuntu orb-create-vms orb-create-vms-ha-cluster-rocky orb-create-vms-ha-cluster-ubuntu orb-create-vms-rocky orb-create-vms-ubuntu orb-delete-vm-calls-offloader-rocky orb-delete-vm-calls-offloader-ubuntu orb-delete-vm-coturn-rocky orb-delete-vm-coturn-ubuntu orb-delete-vm-loadbalancer-rocky orb-delete-vm-loadbalancer-ubuntu orb-delete-vm-monitoring-rocky orb-delete-vm-monitoring-ubuntu orb-delete-vm-nfs-rocky orb-delete-vm-nfs-ubuntu orb-delete-vms orb-delete-vms-ha-cluster-rocky orb-delete-vms-ha-cluster-ubuntu orb-delete-vms-rocky orb-delete-vms-ubuntu ping-local ping-production ping-staging safety-check setup syntax-check test test-all test-certbot test-integration test-integration-check-vms test-integration-db-config test-mattermost test-mattermost-boards test-mattermost-calls test-mattermost-db-config test-mattermost-migrate-to-db test-mattermost-rocky test-nginx test-nginx-rocky test-postgresql test-postgresql-rocky test-rocky test-rtcd test-ubuntu test-unit vault-create vault-create-secure vault-decrypt vault-edit vault-encrypt vault-rekey vault-view
 
 # Default target
 .DEFAULT_GOAL := help
@@ -171,6 +171,16 @@ orb-create-vm-minio-ubuntu: ## Create MinIO VM (Ubuntu)
 	@echo "Creating MinIO VM (Ubuntu)..."
 	@orb create -a amd64 ubuntu minio-ubuntu || echo "minio-ubuntu may already exist"
 	@echo "✓ MinIO VM created. Add to inventory: [minio] $(USER)@minio-ubuntu@orb"
+
+orb-create-vm-nfs-rocky: ## Create NFS server VM (Rocky Linux 9)
+	@echo "Creating NFS server VM (Rocky Linux 9)..."
+	@orb create -a amd64 rocky:9 nfs-rocky || echo "nfs-rocky may already exist"
+	@echo "✓ NFS server VM created. Add to inventory: [nfs] $(USER)@nfs-rocky@orb"
+
+orb-create-vm-nfs-ubuntu: ## Create NFS server VM (Ubuntu)
+	@echo "Creating NFS server VM (Ubuntu)..."
+	@orb create -a amd64 ubuntu nfs-ubuntu || echo "nfs-ubuntu may already exist"
+	@echo "✓ NFS server VM created. Add to inventory: [nfs] $(USER)@nfs-ubuntu@orb"
 
 orb-create-vm-postgresql-rocky: ## Create PostgreSQL VM (Rocky Linux 9)
 	@echo "Creating PostgreSQL VM (Rocky Linux 9)..."
@@ -400,6 +410,14 @@ orb-delete-vm-minio-ubuntu: ## Delete MinIO VM (Ubuntu)
 	@orb delete -f minio-ubuntu 2>/dev/null || true
 	@echo "✓ MinIO VM deleted"
 
+orb-delete-vm-nfs-rocky: ## Delete NFS server VM (Rocky)
+	@orb delete -f nfs-rocky 2>/dev/null || true
+	@echo "✓ NFS server VM deleted"
+
+orb-delete-vm-nfs-ubuntu: ## Delete NFS server VM (Ubuntu)
+	@orb delete -f nfs-ubuntu 2>/dev/null || true
+	@echo "✓ NFS server VM deleted"
+
 orb-delete-vm-postgresql-rocky: ## Delete PostgreSQL VM (Rocky)
 	@orb delete -f postgresql-rocky 2>/dev/null || true
 	@echo "✓ PostgreSQL VM deleted"
@@ -464,9 +482,9 @@ orb-delete-vm-rtcd-ubuntu: ## Delete RTCD VM (Ubuntu)
 
 orb-delete-vms: orb-delete-vms-rocky ## Delete core OrbStack VMs (default: Rocky)
 
-orb-delete-vms-all-rocky: orb-delete-vms-rocky orb-delete-vm-calls-offloader-rocky orb-delete-vm-coturn-rocky orb-delete-vm-elasticsearch-rocky orb-delete-vm-keycloak-rocky orb-delete-vm-ldap1-rocky orb-delete-vm-minio-rocky orb-delete-vm-redis-rocky orb-delete-vm-rtcd-rocky orb-delete-vm-monitoring-rocky ## Delete all Rocky VMs including optional services
+orb-delete-vms-all-rocky: orb-delete-vms-rocky orb-delete-vm-calls-offloader-rocky orb-delete-vm-coturn-rocky orb-delete-vm-elasticsearch-rocky orb-delete-vm-keycloak-rocky orb-delete-vm-ldap1-rocky orb-delete-vm-minio-rocky orb-delete-vm-nfs-rocky orb-delete-vm-redis-rocky orb-delete-vm-rtcd-rocky orb-delete-vm-monitoring-rocky ## Delete all Rocky VMs including optional services
 
-orb-delete-vms-all-ubuntu: orb-delete-vms-ubuntu orb-delete-vm-calls-offloader-ubuntu orb-delete-vm-coturn-ubuntu orb-delete-vm-elasticsearch-ubuntu orb-delete-vm-keycloak-ubuntu orb-delete-vm-ldap1-ubuntu orb-delete-vm-minio-ubuntu orb-delete-vm-redis-ubuntu orb-delete-vm-rtcd-ubuntu orb-delete-vm-monitoring-ubuntu ## Delete all Ubuntu VMs including optional services
+orb-delete-vms-all-ubuntu: orb-delete-vms-ubuntu orb-delete-vm-calls-offloader-ubuntu orb-delete-vm-coturn-ubuntu orb-delete-vm-elasticsearch-ubuntu orb-delete-vm-keycloak-ubuntu orb-delete-vm-ldap1-ubuntu orb-delete-vm-minio-ubuntu orb-delete-vm-nfs-ubuntu orb-delete-vm-redis-ubuntu orb-delete-vm-rtcd-ubuntu orb-delete-vm-monitoring-ubuntu ## Delete all Ubuntu VMs including optional services
 
 orb-delete-vms-rocky: orb-delete-vm-postgresql-rocky ## Delete core Rocky Linux VMs
 	@echo "Deleting core Rocky Linux VMs..."

@@ -931,6 +931,108 @@
   tags: ['runtime-config']
 
 #
+# NFS shared file storage configuration (optional)
+# Alternative to S3/MinIO for HA deployments that cannot use object storage
+#
+- name: Gather facts from NFS host
+  ansible.builtin.setup:
+  delegate_to: "{{ item }}"
+  delegate_facts: true
+  loop: "{{ groups.get('nfs', []) }}"
+  when:
+    - mattermost_enable_nfs | default(false)
+    - groups.get('nfs', []) | length > 0
+  tags: ['configure']
+
+- name: Set NFS server from facts
+  ansible.builtin.set_fact:
+    mattermost_nfs_server: "{{ hostvars[groups['nfs'][0]]['ansible_default_ipv4']['address'] }}"
+  when:
+    - mattermost_enable_nfs | default(false)
+    - groups.get('nfs', []) | length > 0
+    - mattermost_nfs_server == ""
+  tags: ['configure']
+
+- name: Install NFS client packages (RedHat)
+  ansible.builtin.package:
+    name: nfs-utils
+    state: present
+  when:
+    - mattermost_enable_nfs | default(false)
+    - ansible_os_family == "RedHat"
+  tags: ['configure']
+
+- name: Install NFS client packages (Debian)
+  ansible.builtin.package:
+    name: nfs-common
+    state: present
+  when:
+    - mattermost_enable_nfs | default(false)
+    - ansible_os_family == "Debian"
+  tags: ['configure']
+
+- name: Create NFS mount point directory
+  ansible.builtin.file:
+    path: "{{ mattermost_nfs_mount_point }}"
+    state: directory
+    owner: mattermost
+    group: mattermost
+    mode: "0755"
+  when: mattermost_enable_nfs | default(false)
+  tags: ['configure']
+
+- name: Mount NFS share
+  ansible.posix.mount:
+    path: "{{ mattermost_nfs_mount_point }}"
+    src: "{{ mattermost_nfs_server }}:{{ mattermost_nfs_export_path }}"
+    fstype: nfs
+    opts: "{{ mattermost_nfs_mount_options }}"
+    state: mounted
+  when: mattermost_enable_nfs | default(false)
+  tags: ['configure']
+
+- name: Create Mattermost data directory on NFS mount
+  ansible.builtin.file:
+    path: "{{ mattermost_nfs_mount_point }}/data"
+    state: directory
+    owner: mattermost
+    group: mattermost
+    mode: "0755"
+  when: mattermost_enable_nfs | default(false)
+  tags: ['configure']
+
+- name: Configure Mattermost to use NFS mount for file storage
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set FileSettings.Directory {{ mattermost_nfs_mount_point }}/data
+  become: true
+  become_user: mattermost
+  changed_when: true
+  run_once: true
+  when: mattermost_enable_nfs | default(false)
+  tags: ['runtime-config']
+
+- name: Restart Mattermost to apply NFS configuration
+  ansible.builtin.systemd:
+    name: mattermost
+    state: restarted
+  become: true
+  throttle: 1
+  when: mattermost_enable_nfs | default(false)
+  tags: ['runtime-config']
+
+- name: Wait for Mattermost to be ready after NFS config
+  ansible.builtin.uri:
+    url: "http://localhost:8065/api/v4/system/ping"
+    status_code: 200
+  register: mattermost_ping_nfs
+  until: mattermost_ping_nfs.status == 200
+  retries: 30
+  delay: 2
+  when: mattermost_enable_nfs | default(false)
+  tags: ['runtime-config']
+
+#
 # S3/MinIO storage configuration (optional)
 #
 - name: Check current storage driver
@@ -1463,14 +1565,15 @@
     - mattermost_config_storage != "database"
   tags: ['runtime-config']
 
-- name: Validate cluster prerequisites - S3 storage
+- name: Validate cluster prerequisites - shared file storage
   ansible.builtin.fail:
     msg: >
-      High Availability cluster requires S3/MinIO for shared file storage.
-      Set mattermost_enable_s3: true and configure S3 settings in your group_vars.
+      High Availability cluster requires shared file storage (S3/MinIO or NFS).
+      Set either mattermost_enable_s3: true or mattermost_enable_nfs: true in your group_vars.
   when:
     - mattermost_enable_cluster | default(false)
     - not (mattermost_enable_s3 | default(false))
+    - not (mattermost_enable_nfs | default(false))
   tags: ['runtime-config']
 
 - name: Gather facts from all app nodes for cluster discovery

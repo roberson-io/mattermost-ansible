@@ -58,6 +58,21 @@
         packer_build | default(false) | bool or
         enable_minio | default(false) | bool
 
+- name: Deploy NFS Server
+  hosts: nfs
+  become: true
+  gather_facts: true
+  pre_tasks:
+    - name: Install Python SELinux support (RedHat/Rocky)
+      ansible.builtin.raw: dnf install -y python3-libselinux
+      when: ansible_os_family == "RedHat"
+      changed_when: false
+  roles:
+    - role: nfs
+      when: >
+        packer_build | default(false) | bool or
+        enable_nfs | default(false) | bool
+
 - name: Deploy Redis Cache
   hosts: redis
   become: true

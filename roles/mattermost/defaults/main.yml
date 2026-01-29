@@ -60,6 +60,22 @@ mattermost_s3_secret_access_key: ""  # S3 secret access key
 mattermost_s3_secure: true  # Use HTTPS for S3 endpoint
 mattermost_s3_path_prefix: ""  # Optional path prefix within bucket
 
+# NFS shared file storage configuration (optional)
+# Alternative to S3/MinIO for HA deployments that cannot use object storage
+# See: https://docs.mattermost.com/deployment-guide/server/preparations.html#network-file-storage
+# See: https://docs.mattermost.com/administration-guide/scale/high-availability-cluster-based-deployment.html#file-storage-configuration
+mattermost_enable_nfs: false  # Set to true to mount NFS share for file storage
+mattermost_nfs_server: ""  # NFS server address (auto-detected from inventory if empty)
+mattermost_nfs_export_path: "/srv/nfs/mattermost"  # NFS export path on server
+mattermost_nfs_mount_point: "/mnt/mattermost-data"  # Local mount point on Mattermost nodes
+mattermost_nfs_mount_options: "rw,sync,hard,intr,nfsvers=4.1"  # NFS mount options
+# Storage sizing guidance (from Mattermost docs):
+# - Low usage teams: 1-5 MB/user/month
+# - Medium usage teams: 5-25 MB/user/month
+# - High usage teams: 25-100 MB/user/month
+# Formula: users * MB_per_month * 12 months * 2x safety factor
+# Example (15000 users, medium): 1.8TB - 9TB per year
+
 # Elasticsearch/OpenSearch configuration (optional)
 mattermost_enable_elasticsearch: false  # Set to true to enable Elasticsearch
 mattermost_elasticsearch_host: ""  # Elasticsearch host address (e.g., elasticsearch-host:9200)
@@ -75,7 +91,7 @@ mattermost_elasticsearch_enable_autocomplete: true  # Enable autocomplete
 mattermost_elasticsearch_sniff: false  # Enable sniffing (cluster discovery)
 
 # High Availability cluster configuration (optional)
-# Requires: mattermost_config_storage: "database" and mattermost_enable_s3: true
+# Requires: mattermost_config_storage: "database" and shared file storage (mattermost_enable_s3 or mattermost_enable_nfs)
 mattermost_enable_cluster: false  # Set to true to enable HA cluster mode
 mattermost_cluster_name: "production"  # Name of the cluster (e.g., production, staging)
 mattermost_cluster_use_ip_address: true  # Use IP addresses instead of hostnames for cluster communication

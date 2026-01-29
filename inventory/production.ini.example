@@ -38,6 +38,10 @@ app.example.com ansible_user=ubuntu
 # Optional: Enable MinIO object storage by uncommenting and configuring
 # minio.example.com ansible_user=ubuntu
 
+[nfs]
+# Optional: NFS server for shared file storage (alternative to MinIO/S3)
+# nfs.example.com ansible_user=ubuntu
+
 [redis]
 # Optional: Enable Redis cache by uncommenting and configuring
 # redis.example.com ansible_user=ubuntu
@@ -86,6 +90,7 @@ app
 loadbalancer
 rtcd
 minio
+nfs
 redis
 elasticsearch
 keycloak

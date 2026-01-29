@@ -1,0 +1,165 @@
+---
+- name: Include OS-specific variables
+  ansible.builtin.include_vars: "{{ ansible_os_family }}.yml"
+  tags: ['install']
+
+- name: Update apt cache (Debian/Ubuntu)
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_os_family == "Debian"
+  tags: ['install']
+
+- name: Install NFS server packages
+  ansible.builtin.package:
+    name: "{{ nfs_server_packages }}"
+    state: present
+  tags: ['install']
+
+- name: Create NFS export base directory
+  ansible.builtin.file:
+    path: "{{ nfs_export_base_path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags: ['configure']
+
+- name: Create Mattermost export directory
+  ansible.builtin.file:
+    path: "{{ nfs_mattermost_export_path }}"
+    state: directory
+    owner: "{{ nfs_owner }}"
+    group: "{{ nfs_group }}"
+    mode: "{{ nfs_mode }}"
+  tags: ['configure']
+
+- name: Configure NFS exports
+  ansible.builtin.template:
+    src: exports.j2
+    dest: /etc/exports
+    owner: root
+    group: root
+    mode: "0644"
+    backup: true
+  notify:
+    - reload nfs exports
+  tags: ['configure']
+
+# Firewall configuration for RedHat/Rocky
+- name: Check if firewalld is available (RedHat)
+  ansible.builtin.command: which firewall-cmd
+  register: nfs_firewalld_check
+  changed_when: false
+  failed_when: false
+  when: ansible_os_family == "RedHat"
+  tags: ['configure']
+
+- name: Allow NFS through firewall (firewalld - RedHat)
+  ansible.posix.firewalld:
+    service: nfs
+    permanent: true
+    state: enabled
+    immediate: true
+  when:
+    - ansible_os_family == "RedHat"
+    - nfs_firewall_enabled
+    - nfs_firewalld_check.rc == 0
+  tags: ['configure']
+
+- name: Allow mountd through firewall (firewalld - RedHat)
+  ansible.posix.firewalld:
+    service: mountd
+    permanent: true
+    state: enabled
+    immediate: true
+  when:
+    - ansible_os_family == "RedHat"
+    - nfs_firewall_enabled
+    - nfs_firewalld_check.rc == 0
+  tags: ['configure']
+
+- name: Allow rpc-bind through firewall (firewalld - RedHat)
+  ansible.posix.firewalld:
+    service: rpc-bind
+    permanent: true
+    state: enabled
+    immediate: true
+  when:
+    - ansible_os_family == "RedHat"
+    - nfs_firewall_enabled
+    - nfs_firewalld_check.rc == 0
+  tags: ['configure']
+
+# Firewall configuration for Debian/Ubuntu
+- name: Check if ufw is available (Debian/Ubuntu)
+  ansible.builtin.command: which ufw
+  register: nfs_ufw_check
+  changed_when: false
+  failed_when: false
+  when: ansible_os_family == "Debian"
+  tags: ['configure']
+
+- name: Allow NFS through firewall (ufw - Debian/Ubuntu)
+  community.general.ufw:
+    rule: allow
+    port: "{{ nfs_port }}"
+    proto: tcp
+  when:
+    - ansible_os_family == "Debian"
+    - nfs_firewall_enabled
+    - nfs_ufw_check.rc == 0
+  tags: ['configure']
+
+- name: Allow rpcbind through firewall (ufw - Debian/Ubuntu)
+  community.general.ufw:
+    rule: allow
+    port: "{{ nfs_rpcbind_port }}"
+    proto: any
+  when:
+    - ansible_os_family == "Debian"
+    - nfs_firewall_enabled
+    - nfs_ufw_check.rc == 0
+  tags: ['configure']
+
+- name: Allow mountd through firewall (ufw - Debian/Ubuntu)
+  community.general.ufw:
+    rule: allow
+    port: "{{ nfs_mountd_port }}"
+    proto: any
+  when:
+    - ansible_os_family == "Debian"
+    - nfs_firewall_enabled
+    - nfs_ufw_check.rc == 0
+  tags: ['configure']
+
+# Enable and start services
+- name: Enable rpcbind service
+  ansible.builtin.systemd:
+    name: "{{ nfs_rpcbind_service }}"
+    enabled: true
+    state: started
+  tags: ['service-start']
+
+- name: Enable NFS server service
+  ansible.builtin.systemd:
+    name: "{{ nfs_server_service }}"
+    enabled: true
+    state: started
+  tags: ['service-start']
+
+- name: Export NFS shares
+  ansible.builtin.command: exportfs -ra
+  changed_when: false
+  tags: ['service-start']
+
+- name: Verify NFS exports
+  ansible.builtin.command: exportfs -v
+  register: nfs_exports_output
+  changed_when: false
+  tags: ['service-start']
+
+- name: Display NFS exports
+  ansible.builtin.debug:
+    msg: "{{ nfs_exports_output.stdout_lines }}"
+  tags: ['service-start']

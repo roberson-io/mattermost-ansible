@@ -1,0 +1,18 @@
+# Managed by Ansible - Mattermost NFS exports
+# Do not edit manually
+#
+# NFS exports for Mattermost file storage
+# See exports(5) for more information
+
+{% if nfs_allowed_clients | length > 0 %}
+# Explicit client list
+{% for client in nfs_allowed_clients %}
+{{ nfs_mattermost_export_path }} {{ client }}({{ nfs_export_options }})
+{% endfor %}
+{% else %}
+# Allow all Mattermost app hosts
+{% for host in groups.get('app', []) %}
+{% set host_ip = hostvars[host]['ansible_default_ipv4']['address'] | default(host) %}
+{{ nfs_mattermost_export_path }} {{ host_ip }}({{ nfs_export_options }})
+{% endfor %}
+{% endif %}
