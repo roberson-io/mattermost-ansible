@@ -6,6 +6,7 @@
     name: "{{ calls_offloader_group }}"
     state: present
     system: true
+  tags: ['install']
 
 - name: Create calls-offloader user
   ansible.builtin.user:
@@ -16,6 +17,7 @@
     shell: /bin/bash
     system: true
     create_home: false
+  tags: ['install']
 
 - name: Create installation directory
   ansible.builtin.file:
@@ -24,6 +26,7 @@
     owner: "{{ calls_offloader_user }}"
     group: "{{ calls_offloader_group }}"
     mode: '0755'
+  tags: ['install']
 
 - name: Create configuration directory
   ansible.builtin.file:
@@ -32,6 +35,7 @@
     owner: "{{ calls_offloader_user }}"
     group: "{{ calls_offloader_group }}"
     mode: '0755'
+  tags: ['install']
 
 - name: Create log directory
   ansible.builtin.file:
@@ -40,6 +44,7 @@
     owner: "{{ calls_offloader_user }}"
     group: "{{ calls_offloader_group }}"
     mode: '0755'
+  tags: ['install']
 
 - name: Download calls-offloader binary
   ansible.builtin.get_url:
@@ -48,7 +53,8 @@
     owner: "{{ calls_offloader_user }}"
     group: "{{ calls_offloader_group }}"
     mode: '0755'
-  notify: restart calls-offloader
+  notify: Restart calls-offloader
+  tags: ['install']
 
 - name: Create calls-offloader configuration
   ansible.builtin.template:
@@ -57,7 +63,8 @@
     owner: "{{ calls_offloader_user }}"
     group: "{{ calls_offloader_group }}"
     mode: '0640'
-  notify: restart calls-offloader
+  notify: Restart calls-offloader
+  tags: ['configure-base']
 
 - name: Create systemd service file
   ansible.builtin.template:
@@ -65,8 +72,9 @@
     dest: /etc/systemd/system/calls-offloader.service
     mode: '0644'
   notify:
-    - reload systemd
-    - restart calls-offloader
+    - Reload systemd
+    - Restart calls-offloader
+  tags: ['configure-base']
 
 - name: Enable and start calls-offloader service
   ansible.builtin.systemd:
@@ -74,6 +82,8 @@
     enabled: "{{ calls_offloader_service_enabled }}"
     state: "{{ calls_offloader_service_state }}"
     daemon_reload: true
+  when: not (skip_service_start | default(false))
+  tags: ['service-start']
 
 - name: Wait for calls-offloader to be ready
   ansible.builtin.uri:
@@ -85,3 +95,5 @@
   delay: 2
   until: offloader_health.status == 200
   changed_when: false
+  when: not (skip_service_start | default(false))
+  tags: ['service-start']

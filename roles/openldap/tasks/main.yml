@@ -4,6 +4,25 @@
 - name: Include OS-specific variables
   ansible.builtin.include_vars: "{{ ansible_os_family }}.yml"
 
+- name: Update package cache (Debian/Ubuntu)
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_os_family == "Debian"
+
+- name: Update package cache (RedHat/Rocky)
+  ansible.builtin.dnf:
+    update_cache: true
+  when: ansible_os_family == "RedHat"
+
+- name: Upgrade glibc to ensure version consistency (RedHat/Rocky)
+  ansible.builtin.dnf:
+    name:
+      - glibc
+      - glibc-common
+    state: latest
+  when: ansible_os_family == "RedHat"
+
 - name: Install build dependencies
   ansible.builtin.package:
     name: "{{ openldap_build_dependencies }}"

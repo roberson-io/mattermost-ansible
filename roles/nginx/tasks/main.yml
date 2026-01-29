@@ -1,22 +1,38 @@
 ---
 - name: Include OS-specific variables
   ansible.builtin.include_vars: "{{ ansible_os_family }}.yml"
+  tags: ['install']
 - name: Update apt cache (Debian/Ubuntu)
   ansible.builtin.apt:
     update_cache: true
     cache_valid_time: 3600
   when: ansible_os_family == "Debian"
+  tags: ['install']
 
 - name: Install nginx
   ansible.builtin.package:
     name: "{{ nginx_package }}"
     state: present
+  tags: ['install']
 
 - name: Remove default nginx site
   ansible.builtin.file:
     path: "{{ nginx_default_site }}"
     state: absent
   notify: Reload nginx
+  tags: ['configure-base']
+
+# Rocky Linux 9 embeds a default server block in nginx.conf that catches all requests
+# Deploy a clean nginx.conf without the embedded server block for RedHat systems
+- name: Deploy nginx.conf without default server block (RedHat)
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/nginx.conf
+    mode: "0644"
+    backup: true
+  notify: Reload nginx
+  when: ansible_os_family == "RedHat"
+  tags: ['configure-base']
 
 - name: Create nginx configuration for Mattermost (Debian/Ubuntu - sites-available)
   ansible.builtin.template:
@@ -25,6 +41,7 @@
     mode: "0644"
   notify: Reload nginx
   when: ansible_os_family == "Debian"
+  tags: ['configure-base']
 
 - name: Enable Mattermost nginx site (Debian/Ubuntu - sites-enabled symlink)
   ansible.builtin.file:
@@ -33,6 +50,7 @@
     state: link
   notify: Reload nginx
   when: ansible_os_family == "Debian"
+  tags: ['configure-base']
 
 - name: Create nginx configuration for Mattermost (RedHat - conf.d)
   ansible.builtin.template:
@@ -41,6 +59,7 @@
     mode: "0644"
   notify: Reload nginx
   when: ansible_os_family == "RedHat"
+  tags: ['configure-base']
 
 - name: Check if ufw is available (Debian/Ubuntu)
   ansible.builtin.command: which ufw
@@ -48,6 +67,7 @@
   changed_when: false
   failed_when: false
   when: ansible_os_family == "Debian"
+  tags: ['configure-base']
 
 - name: Allow HTTP through firewall (ufw - Debian/Ubuntu)
   community.general.ufw:
@@ -57,6 +77,7 @@
   when:
     - ansible_os_family == "Debian"
     - nginx_ufw_check.rc == 0
+  tags: ['configure-base']
 
 - name: Allow HTTPS through firewall (ufw - Debian/Ubuntu)
   community.general.ufw:
@@ -67,6 +88,7 @@
     - ansible_os_family == "Debian"
     - nginx_ssl_enabled
     - nginx_ufw_check.rc == 0
+  tags: ['configure-base']
 
 - name: Check if firewalld is available (RedHat)
   ansible.builtin.command: which firewall-cmd
@@ -74,6 +96,7 @@
   changed_when: false
   failed_when: false
   when: ansible_os_family == "RedHat"
+  tags: ['configure-base']
 
 - name: Allow HTTP through firewall (firewalld - RedHat)
   ansible.posix.firewalld:
@@ -84,6 +107,7 @@
   when:
     - ansible_os_family == "RedHat"
     - nginx_firewalld_check.rc == 0
+  tags: ['configure-base']
 
 - name: Allow HTTPS through firewall (firewalld - RedHat)
   ansible.posix.firewalld:
@@ -95,6 +119,7 @@
     - ansible_os_family == "RedHat"
     - nginx_ssl_enabled
     - nginx_firewalld_check.rc == 0
+  tags: ['configure-base']
 
 - name: Configure SELinux to allow nginx network connections (RedHat)
   ansible.builtin.command:
@@ -103,6 +128,7 @@
   when:
     - ansible_os_family == "RedHat"
     - ansible_selinux.status == "enabled"
+  tags: ['configure-base']
 
 - name: Configure SELinux to allow nginx database connections (RedHat)
   ansible.builtin.command:
@@ -111,11 +137,13 @@
   when:
     - ansible_os_family == "RedHat"
     - ansible_selinux.status == "enabled"
+  tags: ['configure-base']
 
 - name: Enable nginx
   ansible.builtin.systemd:
     name: "{{ nginx_service_name }}"
     enabled: true
+  tags: ['service-start']
 
 - name: Start nginx
   ansible.builtin.systemd:
@@ -124,3 +152,4 @@
   register: nginx_start
   failed_when: false
   changed_when: nginx_start is changed
+  tags: ['service-start']

@@ -2,7 +2,7 @@
 # keycloak role default variables
 
 # Version and installation
-keycloak_version: "26.4.2"
+keycloak_version: "26.4.4"
 keycloak_download_url: "https://github.com/keycloak/keycloak/releases/download/{{ keycloak_version }}/keycloak-{{ keycloak_version }}.tar.gz"
 keycloak_install_path: /opt/keycloak
 keycloak_user: keycloak

@@ -1,6 +1,6 @@
 ---
 # Mattermost role default variables
-mattermost_version: "10.12.0"
+mattermost_version: "11.3.0"
 mattermost_install_path: /opt/mattermost
 
 # Configuration storage mode
@@ -43,7 +43,7 @@ mattermost_service_environment: "production"  # Required: production, test, or d
 
 # Boards plugin configuration (optional)
 mattermost_enable_boards: false  # Set to true to install Mattermost Boards plugin
-mattermost_boards_version: "9.1.6"  # Version of Boards plugin to install
+mattermost_boards_version: "9.2.2"  # Version of Boards plugin to install
 
 # Redis cache configuration (optional)
 mattermost_enable_redis: false  # Set to true to enable Redis cache

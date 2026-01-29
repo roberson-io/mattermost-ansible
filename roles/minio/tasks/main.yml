@@ -3,23 +3,27 @@
 
 - name: Include OS-specific variables
   ansible.builtin.include_vars: "{{ ansible_os_family }}.yml"
+  tags: ['install']
 
 - name: Update apt cache (Debian/Ubuntu)
   ansible.builtin.apt:
     update_cache: true
     cache_valid_time: 3600
   when: ansible_os_family == "Debian"
+  tags: ['install']
 
 - name: Install required packages
   ansible.builtin.package:
     name: "{{ minio_required_packages }}"
     state: present
+  tags: ['install']
 
 # Install Go
 - name: Check if Go is already installed
   ansible.builtin.stat:
     path: /usr/local/go/bin/go
   register: minio_go_check
+  tags: ['install']
 
 - name: Get latest Go version
   ansible.builtin.uri:
@@ -27,11 +31,13 @@
     return_content: true
   register: minio_go_latest_version
   when: not minio_go_check.stat.exists
+  tags: ['install']
 
 - name: Set Go version to install
   ansible.builtin.set_fact:
     minio_go_version_to_install: "{{ minio_go_latest_version.content.split('\n')[0] | regex_replace('^go', '') | trim }}"
   when: not minio_go_check.stat.exists
+  tags: ['install']
 
 - name: Download Go
   ansible.builtin.get_url:
@@ -39,12 +45,14 @@
     dest: "/tmp/go{{ minio_go_version_to_install }}.linux-amd64.tar.gz"
     mode: "0644"
   when: not minio_go_check.stat.exists
+  tags: ['install']
 
 - name: Remove old Go installation
   ansible.builtin.file:
     path: /usr/local/go
     state: absent
   when: not minio_go_check.stat.exists
+  tags: ['install']
 
 - name: Extract Go
   ansible.builtin.unarchive:
@@ -52,6 +60,7 @@
     dest: /usr/local
     remote_src: true
   when: not minio_go_check.stat.exists
+  tags: ['install']
 
 - name: Add Go to PATH
   ansible.builtin.copy:
@@ -62,6 +71,7 @@
     dest: /etc/profile.d/go.sh
     mode: "0644"
   when: not minio_go_check.stat.exists
+  tags: ['install']
 
 # Create MinIO user and directories
 - name: Create minio group
@@ -69,6 +79,7 @@
     name: "{{ minio_group }}"
     system: true
     state: present
+  tags: ['install']
 
 - name: Create minio user
   ansible.builtin.user:
@@ -78,6 +89,7 @@
     create_home: false
     shell: /usr/sbin/nologin
     state: present
+  tags: ['install']
 
 - name: Create minio directories
   ansible.builtin.file:
@@ -91,12 +103,14 @@
     - "{{ minio_install_path }}/bin"
     - "{{ minio_config_path }}"
     - "{{ minio_data_path }}"
+  tags: ['install']
 
 # Build MinIO from source
 - name: Check if MinIO binary exists
   ansible.builtin.stat:
     path: "{{ minio_install_path }}/bin/minio"
   register: minio_binary
+  tags: ['install']
 
 - name: Clone MinIO repository
   ansible.builtin.git:
@@ -105,17 +119,27 @@
     version: "{{ minio_version }}"
     depth: 1
   when: not minio_binary.stat.exists
+  tags: ['install']
 
 - name: Build MinIO from source
   ansible.builtin.shell: |
     export PATH=$PATH:/usr/local/go/bin
     export GOPATH=$HOME/go
+    export GOPROXY=https://proxy.golang.org,direct
     cd {{ minio_build_path }}
     go build -o {{ minio_install_path }}/bin/minio
   args:
     creates: "{{ minio_install_path }}/bin/minio"
   when: not minio_binary.stat.exists
   notify: Restart minio
+  tags: ['install']
+  register: minio_build_output
+
+- name: Display MinIO build output
+  ansible.builtin.debug:
+    var: minio_build_output
+  when: minio_build_output is defined
+  tags: ['install']
 
 - name: Set MinIO binary ownership and permissions
   ansible.builtin.file:
@@ -123,12 +147,14 @@
     owner: "{{ minio_user }}"
     group: "{{ minio_group }}"
     mode: "0755"
+  tags: ['install']
 
 - name: Clean up build directory
   ansible.builtin.file:
     path: "{{ minio_build_path }}"
     state: absent
   when: not minio_binary.stat.exists
+  tags: ['install']
 
 # Deploy MinIO configuration
 - name: Create MinIO environment file
@@ -139,6 +165,7 @@
     group: "{{ minio_group }}"
     mode: "0600"
   notify: Restart minio
+  tags: ['configure-base']
 
 - name: Deploy MinIO systemd service
   ansible.builtin.template:
@@ -148,12 +175,15 @@
   notify:
     - Reload systemd
     - Restart minio
+  tags: ['configure-base']
 
 - name: Enable MinIO service
   ansible.builtin.systemd:
     name: minio
     enabled: true
     daemon_reload: true
+  when: not (skip_service_start | default(false))
+  tags: ['service-start']
 
 - name: Start MinIO service
   ansible.builtin.systemd:
@@ -161,6 +191,8 @@
     state: started
   register: minio_start
   failed_when: false
+  when: not (skip_service_start | default(false))
+  tags: ['service-start']
 
 # Firewall configuration
 - name: Check if ufw is available (Debian/Ubuntu)
@@ -169,6 +201,7 @@
   changed_when: false
   failed_when: false
   when: ansible_os_family == "Debian"
+  tags: ['configure-base']
 
 - name: Allow MinIO API port through firewall (ufw - Debian/Ubuntu)
   community.general.ufw:
@@ -178,6 +211,7 @@
   when:
     - ansible_os_family == "Debian"
     - minio_ufw_check.rc == 0
+  tags: ['configure-base']
 
 - name: Allow MinIO Console port through firewall (ufw - Debian/Ubuntu)
   community.general.ufw:
@@ -187,6 +221,7 @@
   when:
     - ansible_os_family == "Debian"
     - minio_ufw_check.rc == 0
+  tags: ['configure-base']
 
 - name: Check if firewalld is available (RedHat)
   ansible.builtin.command: which firewall-cmd
@@ -194,6 +229,7 @@
   changed_when: false
   failed_when: false
   when: ansible_os_family == "RedHat"
+  tags: ['configure-base']
 
 - name: Allow MinIO API port through firewall (firewalld - RedHat)
   ansible.posix.firewalld:
@@ -204,6 +240,7 @@
   when:
     - ansible_os_family == "RedHat"
     - minio_firewalld_check.rc == 0
+  tags: ['configure-base']
 
 - name: Allow MinIO Console port through firewall (firewalld - RedHat)
   ansible.posix.firewalld:
@@ -214,6 +251,7 @@
   when:
     - ansible_os_family == "RedHat"
     - minio_firewalld_check.rc == 0
+  tags: ['configure-base']
 
 # SELinux configuration
 - name: Set SELinux file context policy for MinIO binary
@@ -224,6 +262,7 @@
   when:
     - ansible_os_family == "RedHat"
     - ansible_selinux.status == "enabled"
+  tags: ['configure-base']
 
 - name: Set SELinux file context policy for MinIO data directory
   community.general.sefcontext:
@@ -233,6 +272,7 @@
   when:
     - ansible_os_family == "RedHat"
     - ansible_selinux.status == "enabled"
+  tags: ['configure-base']
 
 - name: Apply SELinux context to MinIO installation
   ansible.builtin.command:
@@ -242,3 +282,4 @@
     - ansible_os_family == "RedHat"
     - ansible_selinux.status == "enabled"
   notify: Restart minio
+  tags: ['configure-base']

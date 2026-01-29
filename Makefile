@@ -448,10 +448,10 @@ orb-delete-vms-elasticsearch-cluster-rocky: orb-delete-vm-elasticsearch1-rocky o
 
 orb-delete-vms-elasticsearch-cluster-ubuntu: orb-delete-vm-elasticsearch1-ubuntu orb-delete-vm-elasticsearch2-ubuntu orb-delete-vm-elasticsearch3-ubuntu ## Delete 3-node Elasticsearch cluster (Ubuntu)
 
-orb-delete-vms-ha-cluster-rocky: orb-delete-vm-app1-rocky orb-delete-vm-app2-rocky orb-delete-vm-loadbalancer-rocky orb-delete-vm-minio-rocky orb-delete-vm-redis-rocky ## Delete HA cluster VMs (Rocky: 2 app nodes, LB, MinIO, Redis)
+orb-delete-vms-ha-cluster-rocky: orb-delete-vm-postgresql-rocky orb-delete-vm-app1-rocky orb-delete-vm-app2-rocky orb-delete-vm-loadbalancer-rocky orb-delete-vm-minio-rocky orb-delete-vm-redis-rocky orb-delete-vm-keycloak-rocky orb-delete-vm-ldap1-rocky ## Delete HA cluster VMs (Rocky: DB, 2 app nodes, LB, MinIO, Redis, Keycloak, LDAP)
 	@echo "✓ HA cluster VMs deleted (Rocky Linux 9)"
 
-orb-delete-vms-ha-cluster-ubuntu: orb-delete-vm-app1-ubuntu orb-delete-vm-app2-ubuntu orb-delete-vm-loadbalancer-ubuntu orb-delete-vm-minio-ubuntu orb-delete-vm-redis-ubuntu ## Delete HA cluster VMs (Ubuntu: 2 app nodes, LB, MinIO, Redis)
+orb-delete-vms-ha-cluster-ubuntu: orb-delete-vm-postgresql-ubuntu orb-delete-vm-app1-ubuntu orb-delete-vm-app2-ubuntu orb-delete-vm-loadbalancer-ubuntu orb-delete-vm-minio-ubuntu orb-delete-vm-redis-ubuntu orb-delete-vm-keycloak-ubuntu orb-delete-vm-ldap1-ubuntu ## Delete HA cluster VMs (Ubuntu: DB, 2 app nodes, LB, MinIO, Redis, Keycloak, LDAP)
 	@echo "✓ HA cluster VMs deleted (Ubuntu)"
 
 orb-delete-vm-rtcd-rocky: ## Delete RTCD VM (Rocky)
@@ -464,18 +464,22 @@ orb-delete-vm-rtcd-ubuntu: ## Delete RTCD VM (Ubuntu)
 
 orb-delete-vms: orb-delete-vms-rocky ## Delete core OrbStack VMs (default: Rocky)
 
-orb-delete-vms-all-rocky: orb-delete-vms-rocky orb-delete-vm-calls-offloader-rocky orb-delete-vm-coturn-rocky orb-delete-vm-elasticsearch-rocky orb-delete-vm-keycloak-rocky orb-delete-vm-minio-rocky orb-delete-vm-redis-rocky orb-delete-vm-rtcd-rocky ## Delete all Rocky VMs including optional services
+orb-delete-vms-all-rocky: orb-delete-vms-rocky orb-delete-vm-calls-offloader-rocky orb-delete-vm-coturn-rocky orb-delete-vm-elasticsearch-rocky orb-delete-vm-keycloak-rocky orb-delete-vm-ldap1-rocky orb-delete-vm-minio-rocky orb-delete-vm-redis-rocky orb-delete-vm-rtcd-rocky orb-delete-vm-monitoring-rocky ## Delete all Rocky VMs including optional services
 
-orb-delete-vms-all-ubuntu: orb-delete-vms-ubuntu orb-delete-vm-calls-offloader-ubuntu orb-delete-vm-coturn-ubuntu orb-delete-vm-elasticsearch-ubuntu orb-delete-vm-keycloak-ubuntu orb-delete-vm-minio-ubuntu orb-delete-vm-redis-ubuntu orb-delete-vm-rtcd-ubuntu ## Delete all Ubuntu VMs including optional services
+orb-delete-vms-all-ubuntu: orb-delete-vms-ubuntu orb-delete-vm-calls-offloader-ubuntu orb-delete-vm-coturn-ubuntu orb-delete-vm-elasticsearch-ubuntu orb-delete-vm-keycloak-ubuntu orb-delete-vm-ldap1-ubuntu orb-delete-vm-minio-ubuntu orb-delete-vm-redis-ubuntu orb-delete-vm-rtcd-ubuntu orb-delete-vm-monitoring-ubuntu ## Delete all Ubuntu VMs including optional services
 
 orb-delete-vms-rocky: orb-delete-vm-postgresql-rocky ## Delete core Rocky Linux VMs
 	@echo "Deleting core Rocky Linux VMs..."
 	@orb delete -f mattermost-rocky 2>/dev/null || true
+	@orb delete -f mattermost1-rocky 2>/dev/null || true
+	@orb delete -f mattermost2-rocky 2>/dev/null || true
 	@echo "✓ Core Rocky VMs deleted"
 
 orb-delete-vms-ubuntu: orb-delete-vm-postgresql-ubuntu ## Delete core Ubuntu VMs
 	@echo "Deleting core Ubuntu VMs..."
 	@orb delete -f mattermost-ubuntu 2>/dev/null || true
+	@orb delete -f mattermost1-ubuntu 2>/dev/null || true
+	@orb delete -f mattermost2-ubuntu 2>/dev/null || true
 	@echo "✓ Core Ubuntu VMs deleted"
 
 ping-local: ## Test connectivity to local VMs

@@ -2,7 +2,7 @@
 # rtcd role default variables
 
 # Version and installation
-rtcd_version: "v1.2.1"
+rtcd_version: "v1.2.4"
 rtcd_download_url: "https://github.com/mattermost/rtcd/releases/download/{{ rtcd_version }}/rtcd-linux-amd64"
 rtcd_install_path: /opt/rtcd
 rtcd_config_path: /etc/rtcd

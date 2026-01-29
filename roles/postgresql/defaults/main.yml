@@ -2,7 +2,7 @@
 # PostgreSQL role default variables
 # PostgreSQL version to install (e.g., "14", "15", "16")
 # Note: Mattermost v11.0+ requires PostgreSQL 14 or higher
-postgresql_version: "16"
+postgresql_version: "18"
 
 postgresql_listen_addresses: "*"
 

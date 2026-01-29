@@ -1,22 +1,25 @@
 ---
 - name: Include OS-specific variables
   ansible.builtin.include_vars: "{{ ansible_os_family }}.yml"
+  tags: ['install']
 
 #
 # Set hostname from inventory (required for HA cluster node identification)
 #
 - name: Set system hostname from inventory
   ansible.builtin.hostname:
-    name: "{{ inventory_hostname }}"
+    name: "{{ (inventory_hostname.split('@')[-2] if '@orb' in inventory_hostname else inventory_hostname.split('@')[-1].split('.')[0]) }}"
   when:
     - mattermost_enable_cluster | default(false)
     - inventory_hostname != ansible_hostname
+  tags: ['runtime-config']
 
 - name: Update apt cache (Debian/Ubuntu)
   ansible.builtin.apt:
     update_cache: true
     cache_valid_time: 3600
   when: ansible_os_family == "Debian"
+  tags: ['install']
 
 - name: Remove curl-minimal if present (RedHat/Rocky)
   ansible.builtin.package:
@@ -24,16 +27,19 @@
     state: absent
   when: ansible_os_family == "RedHat"
   failed_when: false
+  tags: ['install']
 
 - name: Install required packages
   ansible.builtin.package:
     name: "{{ mattermost_packages }}"
     state: present
+  tags: ['install']
 
 - name: Check if Mattermost is already installed
   ansible.builtin.stat:
     path: "{{ mattermost_install_path }}/bin/mattermost"
   register: mattermost_binary
+  tags: ['install']
 
 - name: Get current Mattermost version
   ansible.builtin.shell:
@@ -45,6 +51,7 @@
   changed_when: false
   failed_when: false
   when: mattermost_binary.stat.exists
+  tags: ['install']
 
 - name: Set version comparison facts
   ansible.builtin.set_fact:
@@ -55,6 +62,7 @@
          mattermost_current_version.stdout | length > 0 and
          mattermost_current_version.stdout != mattermost_version }}
     mattermost_installed_version: "{{ mattermost_current_version.stdout | default('none') }}"
+  tags: ['install']
 
 - name: Display version information
   ansible.builtin.debug:
@@ -65,12 +73,14 @@
         Action needed: {{ 'fresh install' if mattermost_needs_install
         else ('upgrade/downgrade' if mattermost_needs_upgrade
         else 'none (already at desired version)') }}
+  tags: ['install']
 
 - name: Stop Mattermost for upgrade/downgrade
   ansible.builtin.systemd:
     name: mattermost
     state: stopped
   when: mattermost_needs_upgrade
+  tags: ['install']
 
 - name: Ensure backup directory exists on database host
   ansible.builtin.file:
@@ -85,6 +95,7 @@
     - mattermost_needs_upgrade
     - groups.get('database', []) | length > 0
     - not (mattermost_skip_db_backup | default(false))
+  tags: ['runtime-config']
 
 - name: Backup database before upgrade/downgrade
   community.postgresql.postgresql_db:
@@ -99,6 +110,7 @@
     - mattermost_needs_upgrade
     - groups.get('database', []) | length > 0
     - not (mattermost_skip_db_backup | default(false))
+  tags: ['runtime-config']
 
 - name: Backup Mattermost application directory
   ansible.builtin.copy:
@@ -110,12 +122,14 @@
     mode: "0755"
   register: mattermost_app_backup
   when: mattermost_needs_upgrade
+  tags: ['install']
 
 - name: Remove old Mattermost tarball for upgrade/downgrade
   ansible.builtin.file:
     path: /tmp/mattermost.tar.gz
     state: absent
   when: mattermost_needs_upgrade
+  tags: ['install']
 
 - name: Download Mattermost
   ansible.builtin.get_url:
@@ -125,6 +139,7 @@
     force: true
     timeout: 300
   when: mattermost_needs_install or mattermost_needs_upgrade
+  tags: ['install']
 
 - name: Extract Mattermost (fresh install)
   ansible.builtin.unarchive:
@@ -133,6 +148,7 @@
     remote_src: true
     creates: "{{ mattermost_install_path }}"
   when: mattermost_needs_install
+  tags: ['install']
 
 - name: Extract new Mattermost version to temporary location
   ansible.builtin.unarchive:
@@ -140,6 +156,7 @@
     dest: /tmp
     remote_src: true
   when: mattermost_needs_upgrade
+  tags: ['install']
 
 - name: Remove old Mattermost files
   ansible.builtin.shell: |
@@ -153,6 +170,7 @@
       -exec rm -rf {} \;
   changed_when: true
   when: mattermost_needs_upgrade
+  tags: ['install']
 
 - name: Remove old client directory contents (except plugins)
   ansible.builtin.shell: |
@@ -163,18 +181,21 @@
   changed_when: true
   when: mattermost_needs_upgrade
   failed_when: false
+  tags: ['install']
 
 - name: Copy new Mattermost files from temp to installation directory
   ansible.builtin.shell: |
     sudo cp -an /tmp/mattermost/. {{ mattermost_install_path }}/
   changed_when: true
   when: mattermost_needs_upgrade
+  tags: ['install']
 
 - name: Remove temporary Mattermost extraction
   ansible.builtin.file:
     path: /tmp/mattermost
     state: absent
   when: mattermost_needs_upgrade
+  tags: ['install']
 
 - name: Set ownership of Mattermost files after upgrade
   ansible.builtin.file:
@@ -183,6 +204,7 @@
     group: mattermost
     recurse: true
   when: mattermost_needs_upgrade
+  tags: ['configure-base']
 
 - name: Display upgrade completion message
   ansible.builtin.debug:
@@ -196,6 +218,7 @@
       - "=========================================="
       - "NOTE: Users may need to refresh their browsers"
   when: mattermost_needs_upgrade
+  tags: ['install']
 
 - name: Create mattermost user
   ansible.builtin.user:
@@ -204,6 +227,7 @@
     shell: /bin/bash
     home: "{{ mattermost_install_path }}"
     createhome: false
+  tags: ['configure-base']
 
 - name: Create Mattermost data directory
   ansible.builtin.file:
@@ -212,6 +236,7 @@
     owner: mattermost
     group: mattermost
     mode: "0755"
+  tags: ['configure-base']
 
 - name: Set Mattermost directory ownership
   ansible.builtin.file:
@@ -219,6 +244,7 @@
     owner: mattermost
     group: mattermost
     recurse: true
+  tags: ['configure-base']
 
 # SELinux configuration (per Mattermost documentation)
 - name: Set SELinux file context policy for Mattermost directory
@@ -229,6 +255,7 @@
   when:
     - ansible_os_family == "RedHat"
     - ansible_selinux.status == "enabled"
+  tags: ['configure-base']
 
 - name: Set SELinux file context policy for Mattermost binaries
   community.general.sefcontext:
@@ -238,6 +265,7 @@
   when:
     - ansible_os_family == "RedHat"
     - ansible_selinux.status == "enabled"
+  tags: ['configure-base']
 
 - name: Set SELinux file context policy for Mattermost config directory
   community.general.sefcontext:
@@ -247,6 +275,7 @@
   when:
     - ansible_os_family == "RedHat"
     - ansible_selinux.status == "enabled"
+  tags: ['configure-base']
 
 - name: Apply SELinux context to Mattermost installation
   ansible.builtin.command:
@@ -255,6 +284,7 @@
   when:
     - ansible_os_family == "RedHat"
     - ansible_selinux.status == "enabled"
+  tags: ['configure-base']
 
 #
 # fapolicyd configuration (RHEL 8+)
@@ -263,6 +293,7 @@
   ansible.builtin.stat:
     path: /usr/sbin/fapolicyd
   register: mattermost_fapolicyd_binary
+  tags: ['configure-base']
 
 - name: Get list of all plugin binaries
   ansible.builtin.find:
@@ -274,6 +305,7 @@
   when:
     - ansible_os_family == "RedHat"
     - mattermost_fapolicyd_binary.stat.exists
+  tags: ['configure-base']
 
 - name: Add Mattermost binaries to fapolicyd trust database
   ansible.builtin.shell:
@@ -289,6 +321,7 @@
     - ansible_os_family == "RedHat"
     - mattermost_fapolicyd_binary.stat.exists
   notify: Restart mattermost
+  tags: ['configure-base']
 
 #
 # System limits configuration for HA cluster (optional)
@@ -303,6 +336,7 @@
     - soft
     - hard
   when: mattermost_configure_system_limits | default(false)
+  tags: ['configure-base']
 
 - name: Configure system limits for Mattermost user (max processes)
   community.general.pam_limits:
@@ -314,6 +348,7 @@
     - soft
     - hard
   when: mattermost_configure_system_limits | default(false)
+  tags: ['configure-base']
 
 - name: Display system limits configuration status
   ansible.builtin.debug:
@@ -322,6 +357,7 @@
       - "Max open files: {{ mattermost_max_open_files }}"
       - "Max processes: {{ mattermost_max_processes }}"
   when: mattermost_configure_system_limits | default(false)
+  tags: ['configure-base']
 
 #
 # TCP/IP network optimizations for HA cluster (optional)
@@ -342,21 +378,25 @@
     - { name: "net.core.somaxconn", value: "1024" }
     - { name: "net.core.netdev_max_backlog", value: "5000" }
   when: mattermost_configure_network_optimizations | default(false)
+  tags: ['configure-base']
 
 - name: Display network optimizations configuration status
   ansible.builtin.debug:
     msg: "TCP/IP network optimizations configured for HA cluster"
   when: mattermost_configure_network_optimizations | default(false)
+  tags: ['configure-base']
 
 - name: Debug database host value
   ansible.builtin.debug:
     msg: "Database host will be: {{ mattermost_db_host | default('UNDEFINED') }}"
+  tags: ['runtime-config']
 
 # Detect current configuration storage mode
 - name: Check if environment file exists (indicates database mode was previously used)
   ansible.builtin.stat:
     path: "{{ mattermost_install_path }}/config/mattermost.environment"
   register: mattermost_env_file_stat
+  tags: ['runtime-config']
 
 - name: Check if MM_CONFIG is set in systemd service
   ansible.builtin.shell: grep -q "EnvironmentFile=" /etc/systemd/system/mattermost.service || echo "not-found"
@@ -364,19 +404,23 @@
   changed_when: false
   failed_when: false
   when: mattermost_env_file_stat.stat.exists
+  tags: ['runtime-config']
 
 - name: Determine previous configuration mode
   ansible.builtin.set_fact:
     mattermost_previous_mode: "{{ 'database' if (mattermost_env_file_stat.stat.exists and mattermost_systemd_envfile_check.rc == 0) else 'file' }}"
+  tags: ['runtime-config']
 
 - name: Detect configuration mode change
   ansible.builtin.set_fact:
     mattermost_mode_changed: "{{ mattermost_previous_mode != mattermost_config_storage }}"
+  tags: ['runtime-config']
 
 - name: Display migration information
   ansible.builtin.debug:
     msg: "Configuration storage migration: {{ mattermost_previous_mode }} -> {{ mattermost_config_storage }}"
   when: mattermost_mode_changed | bool
+  tags: ['runtime-config']
 
 # Migration: File to Database
 - name: Migrate configuration from file to database
@@ -393,6 +437,7 @@
         owner: mattermost
         group: mattermost
         mode: "0600"
+      tags: ['runtime-config']
 
     - name: Update systemd service for database mode
       ansible.builtin.template:
@@ -402,6 +447,7 @@
       notify:
         - Reload systemd
         - Restart mattermost
+      tags: ['runtime-config']
 
     - name: Flush handlers to restart with database config
       ansible.builtin.meta: flush_handlers
@@ -439,6 +485,7 @@
     - mattermost_previous_mode == "database"
     - mattermost_config_storage == "file"
     - mattermost_binary.stat.exists
+  tags: ['runtime-config']
   block:
     - name: Remove environment file
       ansible.builtin.file:
@@ -504,6 +551,7 @@
   when:
     - mattermost_config_storage == "file"
     - not (mattermost_mode_changed | bool)
+  tags: ['runtime-config']
   block:
     - name: Configure Mattermost database connection
       ansible.builtin.replace:
@@ -554,6 +602,7 @@
   when:
     - mattermost_config_storage == "database"
     - not (mattermost_mode_changed | bool)
+  tags: ['runtime-config']
   block:
     - name: Deploy Mattermost environment file for database config
       ansible.builtin.template:
@@ -571,6 +620,7 @@
     owner: mattermost
     group: mattermost
     mode: "0600"
+  tags: ['runtime-config']
   when: mattermost_config_storage == "database"
   notify: Restart mattermost
 
@@ -582,25 +632,30 @@
   notify:
     - Reload systemd
     - Restart mattermost
+  tags: ['configure-base']
 
 - name: Enable Mattermost service
   ansible.builtin.systemd:
     name: mattermost
     enabled: true
 
+  tags: ['service-start']
 - name: Flush handlers before starting Mattermost
   ansible.builtin.meta: flush_handlers
 
+  tags: ['service-start']
 - name: Start Mattermost service
   ansible.builtin.systemd:
     name: mattermost
     state: started
+  tags: ['service-start']
   register: mattermost_start
   failed_when: false
   changed_when: mattermost_start is changed
 
 - name: Check if ufw is available (Debian/Ubuntu)
   ansible.builtin.command: which ufw
+  tags: ['configure-base']
   register: mattermost_ufw_check
   changed_when: false
   failed_when: false
@@ -611,12 +666,14 @@
     rule: allow
     port: "8065"
     proto: tcp
+  tags: ['configure-base']
   when:
     - ansible_os_family == "Debian"
     - mattermost_ufw_check.rc == 0
 
 - name: Check if firewalld is available (RedHat)
   ansible.builtin.command: which firewall-cmd
+  tags: ['configure-base']
   register: mattermost_firewalld_check
   changed_when: false
   failed_when: false
@@ -628,6 +685,7 @@
     permanent: true
     state: enabled
     immediate: true
+  tags: ['configure-base']
   when:
     - ansible_os_family == "RedHat"
     - mattermost_firewalld_check.rc == 0
@@ -639,12 +697,14 @@
 # License activation (optional)
 - name: Flush handlers to ensure Mattermost is restarted with local mode enabled
   ansible.builtin.meta: flush_handlers
+  tags: ['runtime-config']
   when: mattermost_config_storage == "file"
 
 - name: Wait for Mattermost to be ready (file config mode)
   ansible.builtin.uri:
     url: "http://localhost:8065/api/v4/system/ping"
     status_code: 200
+  tags: ['runtime-config']
   register: mattermost_ping
   until: mattermost_ping.status == 200
   retries: 30
@@ -657,6 +717,7 @@
   ansible.builtin.uri:
     url: "http://localhost:8065/api/v4/system/ping"
     status_code: 200
+  tags: ['runtime-config']
   register: mattermost_db_license_ping
   until: mattermost_db_license_ping.status == 200
   retries: 30
@@ -665,16 +726,6 @@
     - mattermost_license_file | length > 0
     - mattermost_config_storage == "database"
 
-- name: Check if license is already installed
-  ansible.builtin.uri:
-    url: "http://localhost:8065/api/v4/license/client?format=old"
-    method: GET
-    return_content: true
-  register: mattermost_license_check
-  changed_when: false
-  failed_when: false
-  when: mattermost_license_file | length > 0
-
 - name: Copy license file to server
   ansible.builtin.copy:
     src: "{{ mattermost_license_file }}"
@@ -682,9 +733,8 @@
     owner: mattermost
     group: mattermost
     mode: "0600"
-  when:
-    - mattermost_license_file | length > 0
-    - mattermost_license_check.status != 200 or (mattermost_license_check.json.IsLicensed | default('false')) == 'false'
+  tags: ['runtime-config']
+  when: mattermost_license_file | length > 0
 
 - name: Upload license using mmctl
   ansible.builtin.command:
@@ -693,27 +743,23 @@
       --local license upload /tmp/mattermost.license
   become: true
   become_user: mattermost
+  tags: ['runtime-config']
   register: mattermost_license_upload
   changed_when: "'uploaded' in mattermost_license_upload.stdout.lower()"
   failed_when: false
-  when:
-    - mattermost_license_file | length > 0
-    - mattermost_license_check.status != 200 or (mattermost_license_check.json.IsLicensed | default('false')) == 'false'
+  when: mattermost_license_file | length > 0
 
 - name: Remove temporary license file
   ansible.builtin.file:
     path: "/tmp/mattermost.license"
     state: absent
-  when:
-    - mattermost_license_file | length > 0
-    - mattermost_license_check.status != 200 or (mattermost_license_check.json.IsLicensed | default('false')) == 'false'
+  tags: ['runtime-config']
+  when: mattermost_license_file | length > 0
 
-- name: Display license information
+- name: Display license upload result
   ansible.builtin.debug:
-    msg: >-
-      {{ 'License already installed' if (mattermost_license_check.status == 200 and
-      (mattermost_license_check.json.IsLicensed | default('false')) == 'true') else
-      'License uploaded: ' + (mattermost_license_upload.stdout | default('No license uploaded')) }}
+    msg: "License upload: {{ mattermost_license_upload.stdout | default('No output') }}"
+  tags: ['runtime-config']
   when: mattermost_license_file | length > 0
 
 #
@@ -730,7 +776,9 @@
   register: mattermost_current_cache_type
   changed_when: false
   failed_when: false
+  run_once: true
   when: not (mattermost_enable_redis | default(false))
+  tags: ['runtime-config']
 
 - name: Revert to LRU cache when Redis is disabled
   ansible.builtin.command:
@@ -740,9 +788,11 @@
   become_user: mattermost
   changed_when: true
   register: mattermost_redis_disabled
+  run_once: true
   when:
     - not (mattermost_enable_redis | default(false))
     - "'lru' not in mattermost_current_cache_type.stdout | lower"
+  tags: ['runtime-config']
 
 - name: Clear Redis address when Redis is disabled
   ansible.builtin.command:
@@ -751,9 +801,11 @@
   become: true
   become_user: mattermost
   changed_when: true
+  run_once: true
   when:
     - not (mattermost_enable_redis | default(false))
     - mattermost_redis_disabled is changed
+  tags: ['runtime-config']
 
 - name: Clear Redis password when Redis is disabled
   ansible.builtin.command:
@@ -762,19 +814,23 @@
   become: true
   become_user: mattermost
   changed_when: true
+  run_once: true
   when:
     - not (mattermost_enable_redis | default(false))
     - mattermost_redis_disabled is changed
   no_log: true
+  tags: ['runtime-config']
 
 - name: Restart Mattermost to apply cache type change
   ansible.builtin.systemd:
     name: mattermost
     state: restarted
   become: true
+  throttle: 1
   when:
     - not (mattermost_enable_redis | default(false))
     - mattermost_redis_disabled is changed
+  tags: ['runtime-config']
 
 - name: Wait for Mattermost to be ready after disabling Redis
   ansible.builtin.uri:
@@ -785,6 +841,7 @@
   retries: 30
   delay: 2
   when: not (mattermost_enable_redis | default(false))
+  tags: ['runtime-config']
 
 # Enable Redis configuration
 - name: Gather facts from redis host
@@ -795,6 +852,7 @@
   when:
     - mattermost_enable_redis | default(false)
     - groups.get('redis', []) | length > 0
+  tags: ['runtime-config']
 
 - name: Set Redis host from facts
   ansible.builtin.set_fact:
@@ -803,6 +861,7 @@
     - mattermost_enable_redis | default(false)
     - groups.get('redis', []) | length > 0
     - mattermost_redis_host == ""
+  tags: ['runtime-config']
 
 - name: Configure Redis address
   ansible.builtin.command:
@@ -811,7 +870,9 @@
   become: true
   become_user: mattermost
   changed_when: true
+  run_once: true
   when: mattermost_enable_redis | default(false)
+  tags: ['runtime-config']
 
 - name: Configure Redis database number
   ansible.builtin.command:
@@ -820,7 +881,9 @@
   become: true
   become_user: mattermost
   changed_when: true
+  run_once: true
   when: mattermost_enable_redis | default(false)
+  tags: ['runtime-config']
 
 - name: Configure Redis cache type
   ansible.builtin.command:
@@ -829,7 +892,9 @@
   become: true
   become_user: mattermost
   changed_when: true
+  run_once: true
   when: mattermost_enable_redis | default(false)
+  tags: ['runtime-config']
 
 - name: Configure Redis password
   ansible.builtin.command:
@@ -838,17 +903,21 @@
   become: true
   become_user: mattermost
   changed_when: true
+  run_once: true
   when:
     - mattermost_enable_redis | default(false)
     - mattermost_redis_password | default('') | length > 0
   no_log: true
+  tags: ['runtime-config']
 
 - name: Restart Mattermost to apply Redis configuration
   ansible.builtin.systemd:
     name: mattermost
     state: restarted
   become: true
+  throttle: 1
   when: mattermost_enable_redis | default(false)
+  tags: ['runtime-config']
 
 - name: Wait for Mattermost to be ready after Redis config
   ansible.builtin.uri:
@@ -859,6 +928,7 @@
   retries: 30
   delay: 2
   when: mattermost_enable_redis | default(false)
+  tags: ['runtime-config']
 
 #
 # S3/MinIO storage configuration (optional)
@@ -872,7 +942,9 @@
   register: mattermost_current_driver
   changed_when: false
   failed_when: false
+  run_once: true
   when: mattermost_enable_s3 | default(false)
+  tags: ['runtime-config']
 
 - name: Configure S3 storage driver
   ansible.builtin.command:
@@ -882,9 +954,11 @@
   become_user: mattermost
   changed_when: true
   register: mattermost_s3_driver_changed
+  run_once: true
   when:
     - mattermost_enable_s3 | default(false)
     - "'amazons3' not in mattermost_current_driver.stdout | lower"
+  tags: ['runtime-config']
 
 - name: Configure S3 endpoint
   ansible.builtin.command:
@@ -893,9 +967,11 @@
   become: true
   become_user: mattermost
   changed_when: true
+  run_once: true
   when:
     - mattermost_enable_s3 | default(false)
     - mattermost_s3_driver_changed is changed
+  tags: ['runtime-config']
 
 - name: Configure S3 bucket
   ansible.builtin.command:
@@ -904,9 +980,11 @@
   become: true
   become_user: mattermost
   changed_when: true
+  run_once: true
   when:
     - mattermost_enable_s3 | default(false)
     - mattermost_s3_driver_changed is changed
+  tags: ['runtime-config']
 
 - name: Configure S3 region
   ansible.builtin.command:
@@ -915,9 +993,11 @@
   become: true
   become_user: mattermost
   changed_when: true
+  run_once: true
   when:
     - mattermost_enable_s3 | default(false)
     - mattermost_s3_driver_changed is changed
+  tags: ['runtime-config']
 
 - name: Configure S3 access key ID
   ansible.builtin.command:
@@ -926,10 +1006,12 @@
   become: true
   become_user: mattermost
   changed_when: true
+  run_once: true
   when:
     - mattermost_enable_s3 | default(false)
     - mattermost_s3_driver_changed is changed
   no_log: true
+  tags: ['runtime-config']
 
 - name: Configure S3 secret access key
   ansible.builtin.command:
@@ -938,10 +1020,12 @@
   become: true
   become_user: mattermost
   changed_when: true
+  run_once: true
   when:
     - mattermost_enable_s3 | default(false)
     - mattermost_s3_driver_changed is changed
   no_log: true
+  tags: ['runtime-config']
 
 - name: Configure S3 SSL/TLS
   ansible.builtin.command:
@@ -950,9 +1034,11 @@
   become: true
   become_user: mattermost
   changed_when: true
+  run_once: true
   when:
     - mattermost_enable_s3 | default(false)
     - mattermost_s3_driver_changed is changed
+  tags: ['runtime-config']
 
 - name: Configure S3 path prefix
   ansible.builtin.command:
@@ -961,19 +1047,23 @@
   become: true
   become_user: mattermost
   changed_when: true
+  run_once: true
   when:
     - mattermost_enable_s3 | default(false)
     - mattermost_s3_path_prefix | default('') | length > 0
     - mattermost_s3_driver_changed is changed
+  tags: ['runtime-config']
 
 - name: Restart Mattermost to apply S3 configuration
   ansible.builtin.systemd:
     name: mattermost
     state: restarted
   become: true
+  throttle: 1
   when:
     - mattermost_enable_s3 | default(false)
     - mattermost_s3_driver_changed is changed
+  tags: ['runtime-config']
 
 - name: Wait for Mattermost to be ready after S3 config
   ansible.builtin.uri:
@@ -984,11 +1074,13 @@
   retries: 30
   delay: 2
   when: mattermost_enable_s3 | default(false)
+  tags: ['runtime-config']
 
 - name: Display S3 configuration status
   ansible.builtin.debug:
     msg: "S3/MinIO storage configured - Endpoint: {{ mattermost_s3_endpoint }}, Bucket: {{ mattermost_s3_bucket }}"
   when: mattermost_enable_s3 | default(false)
+  tags: ['runtime-config']
 
 #
 # Elasticsearch/OpenSearch configuration (optional)
@@ -1001,6 +1093,7 @@
   when:
     - mattermost_enable_elasticsearch | default(false)
     - groups.get('elasticsearch', []) | length > 0
+  tags: ['runtime-config']
 
 - name: Set Elasticsearch host from facts
   ansible.builtin.set_fact:
@@ -1009,6 +1102,7 @@
     - mattermost_enable_elasticsearch | default(false)
     - groups.get('elasticsearch', []) | length > 0
     - mattermost_elasticsearch_host == ""
+  tags: ['runtime-config']
 
 - name: Configure Elasticsearch backend type
   ansible.builtin.command:
@@ -1017,7 +1111,9 @@
   become: true
   become_user: mattermost
   changed_when: true
+  run_once: true
   when: mattermost_enable_elasticsearch | default(false)
+  tags: ['runtime-config']
 
 - name: Configure Elasticsearch connection URL
   ansible.builtin.command:
@@ -1026,7 +1122,9 @@
   become: true
   become_user: mattermost
   changed_when: true
+  run_once: true
   when: mattermost_enable_elasticsearch | default(false)
+  tags: ['runtime-config']
 
 - name: Configure Elasticsearch username
   ansible.builtin.command:
@@ -1035,10 +1133,12 @@
   become: true
   become_user: mattermost
   changed_when: true
+  run_once: true
   when:
     - mattermost_enable_elasticsearch | default(false)
     - mattermost_elasticsearch_username | default('') | length > 0
   no_log: true
+  tags: ['runtime-config']
 
 - name: Configure Elasticsearch password
   ansible.builtin.command:
@@ -1047,10 +1147,12 @@
   become: true
   become_user: mattermost
   changed_when: true
+  run_once: true
   when:
     - mattermost_enable_elasticsearch | default(false)
     - mattermost_elasticsearch_password | default('') | length > 0
   no_log: true
+  tags: ['runtime-config']
 
 - name: Configure Elasticsearch skip TLS verification
   ansible.builtin.command:
@@ -1061,7 +1163,9 @@
   become: true
   become_user: mattermost
   changed_when: true
+  run_once: true
   when: mattermost_enable_elasticsearch | default(false)
+  tags: ['runtime-config']
 
 - name: Configure Elasticsearch enable indexing
   ansible.builtin.command:
@@ -1070,7 +1174,9 @@
   become: true
   become_user: mattermost
   changed_when: true
+  run_once: true
   when: mattermost_enable_elasticsearch | default(false)
+  tags: ['runtime-config']
 
 - name: Configure Elasticsearch enable searching
   ansible.builtin.command:
@@ -1079,7 +1185,9 @@
   become: true
   become_user: mattermost
   changed_when: true
+  run_once: true
   when: mattermost_enable_elasticsearch | default(false)
+  tags: ['runtime-config']
 
 - name: Configure Elasticsearch enable autocomplete
   ansible.builtin.command:
@@ -1090,7 +1198,9 @@
   become: true
   become_user: mattermost
   changed_when: true
+  run_once: true
   when: mattermost_enable_elasticsearch | default(false)
+  tags: ['runtime-config']
 
 - name: Configure Elasticsearch sniff
   ansible.builtin.command:
@@ -1099,7 +1209,9 @@
   become: true
   become_user: mattermost
   changed_when: true
+  run_once: true
   when: mattermost_enable_elasticsearch | default(false)
+  tags: ['runtime-config']
 
 - name: Configure Elasticsearch CA path
   ansible.builtin.command:
@@ -1108,9 +1220,11 @@
   become: true
   become_user: mattermost
   changed_when: true
+  run_once: true
   when:
     - mattermost_enable_elasticsearch | default(false)
     - mattermost_elasticsearch_ca_path | default('') | length > 0
+  tags: ['runtime-config']
 
 - name: Configure Elasticsearch client certificate path
   ansible.builtin.command:
@@ -1119,9 +1233,11 @@
   become: true
   become_user: mattermost
   changed_when: true
+  run_once: true
   when:
     - mattermost_enable_elasticsearch | default(false)
     - mattermost_elasticsearch_client_cert_path | default('') | length > 0
+  tags: ['runtime-config']
 
 - name: Configure Elasticsearch client key path
   ansible.builtin.command:
@@ -1130,16 +1246,20 @@
   become: true
   become_user: mattermost
   changed_when: true
+  run_once: true
   when:
     - mattermost_enable_elasticsearch | default(false)
     - mattermost_elasticsearch_client_key_path | default('') | length > 0
+  tags: ['runtime-config']
 
 - name: Restart Mattermost to apply Elasticsearch configuration
   ansible.builtin.systemd:
     name: mattermost
     state: restarted
   become: true
+  throttle: 1
   when: mattermost_enable_elasticsearch | default(false)
+  tags: ['runtime-config']
 
 - name: Wait for Mattermost to be ready after Elasticsearch config
   ansible.builtin.uri:
@@ -1150,6 +1270,7 @@
   retries: 30
   delay: 2
   when: mattermost_enable_elasticsearch | default(false)
+  tags: ['runtime-config']
 
 - name: Display Elasticsearch configuration status
   ansible.builtin.debug:
@@ -1159,6 +1280,7 @@
       - "Automatic indexing is enabled for new content"
       - "For bulk indexing of existing content, use System Console > Environment > Elasticsearch > Index Now"
   when: mattermost_enable_elasticsearch | default(false)
+  tags: ['runtime-config']
 
 #
 # Boards plugin installation (optional)
@@ -1172,6 +1294,7 @@
   retries: 30
   delay: 2
   when: mattermost_enable_boards | default(false)
+  tags: ['runtime-config']
 
 - name: Enable plugin uploads (required for Boards plugin)
   ansible.builtin.command:
@@ -1180,7 +1303,9 @@
   become: true
   become_user: mattermost
   changed_when: true
+  run_once: true
   when: mattermost_enable_boards | default(false)
+  tags: ['runtime-config']
 
 - name: Enable plugins (required for Boards plugin)
   ansible.builtin.command:
@@ -1189,7 +1314,9 @@
   become: true
   become_user: mattermost
   changed_when: true
+  run_once: true
   when: mattermost_enable_boards | default(false)
+  tags: ['runtime-config']
 
 - name: Check if Boards plugin is already installed (cluster-wide check)
   ansible.builtin.stat:
@@ -1197,6 +1324,7 @@
   register: mattermost_boards_plugin_installed
   run_once: true
   when: mattermost_enable_boards | default(false)
+  tags: ['runtime-config']
 
 - name: Get current Boards plugin version (cluster-wide check)
   ansible.builtin.shell:
@@ -1213,6 +1341,7 @@
   when:
     - mattermost_enable_boards | default(false)
     - mattermost_boards_plugin_installed.stat.exists
+  tags: ['runtime-config']
 
 - name: Set Boards plugin version facts (cluster-wide)
   ansible.builtin.set_fact:
@@ -1225,6 +1354,7 @@
       {{ not mattermost_boards_plugin_installed.stat.exists }}
   run_once: true
   when: mattermost_enable_boards | default(false)
+  tags: ['runtime-config']
 
 - name: Display Boards plugin version information
   ansible.builtin.debug:
@@ -1236,6 +1366,7 @@
         else ('upgrade/downgrade' if mattermost_boards_needs_upgrade
         else 'none (already at desired version)') }}
   when: mattermost_enable_boards | default(false)
+  tags: ['runtime-config']
 
 - name: Remove old Boards plugin for upgrade/downgrade
   ansible.builtin.command:
@@ -1251,6 +1382,7 @@
   when:
     - mattermost_enable_boards | default(false)
     - mattermost_boards_needs_upgrade | default(false)
+  tags: ['runtime-config']
 
 - name: Set Boards download URL
   ansible.builtin.set_fact:
@@ -1261,6 +1393,7 @@
   when:
     - mattermost_enable_boards | default(false)
     - mattermost_boards_needs_install | default(false) or mattermost_boards_needs_upgrade | default(false)
+  tags: ['runtime-config']
 
 - name: Download Boards plugin
   ansible.builtin.get_url:
@@ -1272,6 +1405,7 @@
   when:
     - mattermost_enable_boards | default(false)
     - mattermost_boards_needs_install | default(false) or mattermost_boards_needs_upgrade | default(false)
+  tags: ['runtime-config']
 
 - name: Install Boards plugin using mmctl
   ansible.builtin.command:
@@ -1287,6 +1421,7 @@
   when:
     - mattermost_enable_boards | default(false)
     - mattermost_boards_needs_install | default(false) or mattermost_boards_needs_upgrade | default(false)
+  tags: ['runtime-config']
 
 - name: Enable Boards plugin
   ansible.builtin.command:
@@ -1298,18 +1433,22 @@
   register: mattermost_boards_enable
   changed_when: "'Enabled' in mattermost_boards_enable.stdout or mattermost_boards_enable.rc == 0"
   failed_when: mattermost_boards_enable.rc != 0 and 'already enabled' not in mattermost_boards_enable.stderr
+  run_once: true
   when: mattermost_enable_boards | default(false)
+  tags: ['runtime-config']
 
 - name: Remove temporary Boards plugin file
   ansible.builtin.file:
     path: "/tmp/mattermost-plugin-boards-v{{ mattermost_boards_version }}.tar.gz"
     state: absent
   when: mattermost_enable_boards | default(false)
+  tags: ['runtime-config']
 
 - name: Display Boards plugin installation status
   ansible.builtin.debug:
     msg: "Mattermost Boards plugin v{{ mattermost_boards_version }} installed and enabled"
   when: mattermost_enable_boards | default(false)
+  tags: ['runtime-config']
 
 #
 # High Availability cluster configuration (optional)
@@ -1322,6 +1461,7 @@
   when:
     - mattermost_enable_cluster | default(false)
     - mattermost_config_storage != "database"
+  tags: ['runtime-config']
 
 - name: Validate cluster prerequisites - S3 storage
   ansible.builtin.fail:
@@ -1331,6 +1471,7 @@
   when:
     - mattermost_enable_cluster | default(false)
     - not (mattermost_enable_s3 | default(false))
+  tags: ['runtime-config']
 
 - name: Gather facts from all app nodes for cluster discovery
   ansible.builtin.setup:
@@ -1340,6 +1481,7 @@
   when:
     - mattermost_enable_cluster | default(false)
     - groups.app | default([]) | length > 1
+  tags: ['runtime-config']
 
 - name: Build cluster node list
   ansible.builtin.set_fact:
@@ -1350,6 +1492,7 @@
   when:
     - mattermost_enable_cluster | default(false)
     - groups.app | default([]) | length > 1
+  tags: ['runtime-config']
 
 - name: Display cluster node information
   ansible.builtin.debug:
@@ -1361,6 +1504,7 @@
   when:
     - mattermost_enable_cluster | default(false)
     - groups.app | default([]) | length > 1
+  tags: ['runtime-config']
 
 - name: Get current cluster configuration
   ansible.builtin.shell:
@@ -1381,6 +1525,7 @@
   failed_when: false
   run_once: true
   when: mattermost_enable_cluster | default(false)
+  tags: ['runtime-config']
 
 - name: Parse current cluster configuration
   ansible.builtin.set_fact:
@@ -1392,6 +1537,7 @@
       readonly: "{{ mattermost_current_cluster_config.stdout_lines | select('match', '^ReadOnlyConfig=') | first | regex_replace('^ReadOnlyConfig=', '') }}"
   run_once: true
   when: mattermost_enable_cluster | default(false)
+  tags: ['runtime-config']
 
 - name: Enable cluster mode
   ansible.builtin.command:
@@ -1404,6 +1550,7 @@
   when:
     - mattermost_enable_cluster | default(false)
     - mattermost_cluster_current.enable != 'true'
+  tags: ['runtime-config']
 
 - name: Configure cluster name
   ansible.builtin.command:
@@ -1416,6 +1563,7 @@
   when:
     - mattermost_enable_cluster | default(false)
     - mattermost_cluster_current.cluster_name != mattermost_cluster_name
+  tags: ['runtime-config']
 
 - name: Configure cluster to use IP address
   ansible.builtin.command:
@@ -1428,6 +1576,7 @@
   when:
     - mattermost_enable_cluster | default(false)
     - mattermost_cluster_current.use_ip != (mattermost_cluster_use_ip_address | lower | string)
+  tags: ['runtime-config']
 
 - name: Configure cluster override hostname
   ansible.builtin.command:
@@ -1440,6 +1589,7 @@
   when:
     - mattermost_enable_cluster | default(false)
     - mattermost_cluster_override_hostname | default('') | length > 0
+  tags: ['runtime-config']
 
 - name: Configure gossip port
   ansible.builtin.command:
@@ -1452,6 +1602,7 @@
   when:
     - mattermost_enable_cluster | default(false)
     - mattermost_cluster_current.gossip_port != (mattermost_gossip_port | string)
+  tags: ['runtime-config']
 
 - name: Configure read-only config
   ansible.builtin.command:
@@ -1464,6 +1615,7 @@
   when:
     - mattermost_enable_cluster | default(false)
     - mattermost_cluster_current.readonly != (mattermost_cluster_read_only_config | lower | string)
+  tags: ['runtime-config']
 
 - name: Check if firewalld is available
   ansible.builtin.command: which firewall-cmd
@@ -1473,6 +1625,7 @@
   when:
     - mattermost_enable_cluster | default(false)
     - ansible_os_family == "RedHat"
+  tags: ['runtime-config']
 
 - name: Configure firewall for gossip port (firewalld)
   ansible.posix.firewalld:
@@ -1484,6 +1637,7 @@
     - mattermost_enable_cluster | default(false)
     - ansible_os_family == "RedHat"
     - mattermost_firewalld_check.rc == 0
+  tags: ['runtime-config']
 
 - name: Configure firewall for streaming port (firewalld)
   ansible.posix.firewalld:
@@ -1495,6 +1649,7 @@
     - mattermost_enable_cluster | default(false)
     - ansible_os_family == "RedHat"
     - mattermost_firewalld_check.rc == 0
+  tags: ['runtime-config']
 
 - name: Check if ufw is available
   ansible.builtin.command: which ufw
@@ -1504,6 +1659,7 @@
   when:
     - mattermost_enable_cluster | default(false)
     - ansible_os_family == "Debian"
+  tags: ['runtime-config']
 
 - name: Configure firewall for gossip port (ufw)
   community.general.ufw:
@@ -1514,6 +1670,7 @@
     - mattermost_enable_cluster | default(false)
     - ansible_os_family == "Debian"
     - mattermost_ufw_check.rc == 0
+  tags: ['runtime-config']
 
 - name: Configure firewall for streaming port (ufw)
   community.general.ufw:
@@ -1524,13 +1681,16 @@
     - mattermost_enable_cluster | default(false)
     - ansible_os_family == "Debian"
     - mattermost_ufw_check.rc == 0
+  tags: ['runtime-config']
 
 - name: Restart Mattermost to apply cluster configuration
   ansible.builtin.systemd:
     name: mattermost
     state: restarted
   become: true
+  throttle: 1
   when: mattermost_enable_cluster | default(false)
+  tags: ['runtime-config']
 
 - name: Wait for Mattermost to be ready after cluster config
   ansible.builtin.uri:
@@ -1541,6 +1701,7 @@
   retries: 30
   delay: 2
   when: mattermost_enable_cluster | default(false)
+  tags: ['runtime-config']
 
 - name: Display cluster configuration status
   ansible.builtin.debug:
@@ -1551,6 +1712,7 @@
       - "Gossip port: {{ mattermost_gossip_port }}"
       - "Streaming port: {{ mattermost_streaming_port }}"
   when: mattermost_enable_cluster | default(false)
+  tags: ['runtime-config']
 
 #
 # Database read replicas configuration (optional)
@@ -1564,6 +1726,7 @@
   changed_when: true
   when:
     - mattermost_db_replicas | default([]) | length > 0
+  tags: ['runtime-config']
 
 - name: Configure database search replicas
   ansible.builtin.command:
@@ -1574,6 +1737,7 @@
   changed_when: true
   when:
     - mattermost_db_search_replicas | default([]) | length > 0
+  tags: ['runtime-config']
 
 - name: Restart Mattermost to apply database replica configuration
   ansible.builtin.systemd:
@@ -1582,6 +1746,7 @@
   become: true
   when:
     - (mattermost_db_replicas | default([]) | length > 0) or (mattermost_db_search_replicas | default([]) | length > 0)
+  tags: ['runtime-config']
 
 - name: Wait for Mattermost to be ready after replica config
   ansible.builtin.uri:
@@ -1593,6 +1758,7 @@
   delay: 2
   when:
     - (mattermost_db_replicas | default([]) | length > 0) or (mattermost_db_search_replicas | default([]) | length > 0)
+  tags: ['runtime-config']
 
 - name: Display database replica configuration status
   ansible.builtin.debug:
@@ -1601,6 +1767,7 @@
       - "Database search replicas configured: {{ mattermost_db_search_replicas | length }}"
   when:
     - (mattermost_db_replicas | default([]) | length > 0) or (mattermost_db_search_replicas | default([]) | length > 0)
+  tags: ['runtime-config']
 
 # ============================================================================
 # Calls Plugin Configuration
@@ -1615,6 +1782,7 @@
   changed_when: false
   when:
     - mattermost_enable_calls | bool
+  tags: ['runtime-config']
 
 - name: Build Calls plugin configuration updates
   ansible.builtin.set_fact:
@@ -1646,12 +1814,14 @@
             allowscreensharing: "{{ mattermost_calls_allow_screen_sharing }}"
   when:
     - mattermost_enable_calls | bool
+  tags: ['runtime-config']
 
 - name: Merge Calls configuration with current config
   ansible.builtin.set_fact:
     mattermost_updated_config: "{{ mattermost_current_config.stdout | from_json | combine(mattermost_calls_config_patch, recursive=true) }}"
   when:
     - mattermost_enable_calls | bool
+  tags: ['runtime-config']
 
 - name: Write updated configuration to temp file
   ansible.builtin.copy:
@@ -1662,6 +1832,7 @@
     mode: '0600'
   when:
     - mattermost_enable_calls | bool
+  tags: ['runtime-config']
 
 - name: Apply Calls plugin configuration via mmctl config patch
   ansible.builtin.command:
@@ -1672,6 +1843,7 @@
   changed_when: true
   when:
     - mattermost_enable_calls | bool
+  tags: ['runtime-config']
 
 - name: Remove temporary config file
   ansible.builtin.file:
@@ -1679,6 +1851,7 @@
     state: absent
   when:
     - mattermost_enable_calls | bool
+  tags: ['runtime-config']
 
 # Performance monitoring configuration
 - name: Enable performance monitoring in Mattermost
@@ -1691,6 +1864,7 @@
   changed_when: true
   when:
     - mattermost_enable_performance_monitoring | bool
+  tags: ['runtime-config']
 
 - name: Set performance monitoring listen address
   ansible.builtin.command:
@@ -1702,6 +1876,7 @@
   changed_when: true
   when:
     - mattermost_enable_performance_monitoring | bool
+  tags: ['runtime-config']
 
 - name: Configure firewall for performance monitoring (firewalld)
   ansible.posix.firewalld:
@@ -1717,6 +1892,7 @@
     - groups['monitoring'] is defined
     - groups['monitoring'] | length > 0
   failed_when: false
+  tags: ['runtime-config']
 
 - name: Configure firewall for performance monitoring (ufw)
   community.general.ufw:
@@ -1731,3 +1907,4 @@
     - groups['monitoring'] is defined
     - groups['monitoring'] | length > 0
   failed_when: false
+  tags: ['runtime-config']

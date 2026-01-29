@@ -5,25 +5,23 @@
 # Connection format examples:
 #
 # OrbStack:
-#   hostname@orb ansible_user=your_user
+#   user@hostname@orb
 #
 # Multipass:
-#   hostname.mshome.net ansible_user=your_user
+#   user@hostname.mshome.net
 #
 # VirtualBox/Vagrant with IP:
-#   hostname ansible_host=192.168.56.10 ansible_user=vagrant
+#   192.168.56.10 ansible_user=vagrant
 #
 # Standard SSH:
-#   hostname ansible_user=your_user ansible_host=192.168.1.10
+#   hostname ansible_user=user ansible_host=192.168.1.10
 
 [database]
-# Example: postgresql@orb ansible_user=your_user
-YOUR_DB_HOST
+postgres-rocky ansible_host=192.168.64.5 ansible_user=michaelroberson
 
 # Single-node Mattermost (default):
-[app]
-# Example: mattermost@orb ansible_user=your_user
-YOUR_APP_HOST
+# [app]
+# michaelroberson@mattermost-rocky@orb
 
 # Multi-node Mattermost HA cluster:
 # REQUIREMENTS for HA cluster:
@@ -35,54 +33,42 @@ YOUR_APP_HOST
 #   - Redis - Optional, recommended for 100,000+ users
 #   - Elasticsearch - Optional, recommended for 2.5M+ posts
 # Number of nodes depends on your reference architecture (see Mattermost scaling docs)
-# [app1]
-# Example: mattermost1@orb ansible_user=your_user
-# YOUR_APP1_HOST
+[app1]
+mattermost1-rocky ansible_host=192.168.64.6 ansible_user=michaelroberson
 
-# [app2]
-# Example: mattermost2@orb ansible_user=your_user
-# YOUR_APP2_HOST
+[app2]
+mattermost2-rocky ansible_host=192.168.64.7 ansible_user=michaelroberson
 
 # Add more app nodes as needed (app3, app4, etc.)
 # [app3]
-# Example: mattermost3@orb ansible_user=your_user
-# YOUR_APP3_HOST
+# mattermost3-rocky ansible_host=192.168.64.10 ansible_user=michaelroberson
 
 # Parent group for all app instances (required for multi-node)
-# [app:children]
-# app1
-# app2
-# Add all app nodes here
+[app:children]
+app1
+app2
 
 # Load balancer (nginx) - Required for multi-node HA cluster
-# [loadbalancer]
-# Example: loadbalancer@orb ansible_user=your_user
-# YOUR_LOADBALANCER_HOST
+[loadbalancer]
+nginx-rocky ansible_host=192.168.64.9 ansible_user=michaelroberson
 
 [rtcd]
-# Optional: Enable Mattermost Calls by uncommenting and configuring
-# Example: rtcd@orb ansible_user=your_user
-# YOUR_RTCD_HOST
+# michaelroberson@rtcd-rocky@orb
 
 [coturn]
-# Optional: TURN server for Mattermost Calls (needed for restrictive firewalls)
-# Example: coturn@orb ansible_user=your_user
-# YOUR_COTURN_HOST
+# michaelroberson@coturn-rocky@orb
 
 [calls_offloader]
-# Optional: Call recording/transcription service (requires Docker)
-# Example: calls-offloader@orb ansible_user=your_user
-# YOUR_CALLS_OFFLOADER_HOST
+# michaelroberson@calls-offloader-rocky@orb
 
 [minio]
 # Optional for single-node, REQUIRED for HA cluster (shared file storage)
-# Example: minio@orb ansible_user=your_user
-# YOUR_MINIO_HOST
+minio-rocky ansible_host=192.168.64.8 ansible_user=michaelroberson
 
 [redis]
 # Optional: Enable Redis cache by uncommenting and configuring
-# Example: redis@orb ansible_user=your_user
-# YOUR_REDIS_HOST
+# Example: your_user@redis@orb
+# YOUR_USER@YOUR_REDIS_HOST
 
 # Elasticsearch search (optional, supports single-node or multi-node cluster)
 # Single-node deployment (development/small scale):
@@ -92,16 +78,16 @@ YOUR_APP_HOST
 # Multi-node cluster deployment (production/enterprise scale, 2-4 nodes recommended):
 # Uncomment and configure multiple elasticsearch instances
 # [elasticsearch1]
-# Example: elasticsearch1@orb ansible_user=your_user
-# YOUR_ELASTICSEARCH1_HOST
+# Example: your_user@elasticsearch1@orb
+# YOUR_USER@YOUR_ELASTICSEARCH1_HOST
 
 # [elasticsearch2]
-# Example: elasticsearch2@orb ansible_user=your_user
-# YOUR_ELASTICSEARCH2_HOST
+# Example: your_user@elasticsearch2@orb
+# YOUR_USER@YOUR_ELASTICSEARCH2_HOST
 
 # [elasticsearch3]
-# Example: elasticsearch3@orb ansible_user=your_user
-# YOUR_ELASTICSEARCH3_HOST
+# Example: your_user@elasticsearch3@orb
+# YOUR_USER@YOUR_ELASTICSEARCH3_HOST
 
 # Parent group for all elasticsearch instances (required for multi-node)
 [elasticsearch:children]
@@ -111,23 +97,28 @@ YOUR_APP_HOST
 
 [keycloak]
 # Optional: Enable Keycloak identity provider by uncommenting and configuring
-# Example: keycloak@orb ansible_user=your_user
-# YOUR_KEYCLOAK_HOST
+# Example: your_user@keycloak@orb
+# YOUR_USER@YOUR_KEYCLOAK_HOST
 
 # OpenLDAP instances (optional, support multiple)
 # Uncomment and add as many LDAP instances as needed (ldap1, ldap2, ldap3, etc.)
 # [ldap1]
-# Example: ldap1@orb ansible_user=your_user
-# YOUR_LDAP1_HOST
+# Example: your_user@ldap1@orb
+# YOUR_USER@YOUR_LDAP1_HOST
 
 # [ldap2]
-# Example: ldap2@orb ansible_user=your_user
-# YOUR_LDAP2_HOST
+# Example: your_user@ldap2@orb
+# YOUR_USER@YOUR_LDAP2_HOST
 
 # Parent group for all LDAP instances
 [ldap:children]
 # ldap1
 # ldap2
+
+[monitoring]
+# Optional: Enable Prometheus and Grafana monitoring by uncommenting and configuring
+# Example: your_user@monitoring@orb
+# michaelroberson@monitoring-rocky@orb
 
 [local:children]
 database
@@ -141,7 +132,10 @@ redis
 elasticsearch
 keycloak
 ldap
+monitoring
 
 [local:vars]
 ansible_python_interpreter=/usr/bin/python3
 deployment_environment=local
+ansible_password=Mattermost-Ansible2025!
+ansible_become_password=Mattermost-Ansible2025!

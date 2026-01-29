@@ -3,6 +3,16 @@
 # Usage:
 #   Local:      ansible-playbook -i inventory/local.ini site.yml
 #   Production: ansible-playbook -i inventory/production.ini site.yml
+#
+# Tag-based deployment for Packer/Terraform integration:
+#   Packer build:   ansible-playbook site.yml --tags "install,configure-base"
+#   Terraform run:  ansible-playbook site.yml --tags "runtime-config,service-start"
+#
+# Tags:
+#   install         - Package installation and software downloads
+#   configure-base  - Base configuration (systemd units, directories, users)
+#   runtime-config  - Runtime configuration (requires IPs, hostnames)
+#   service-start   - Enable and start services
 
 - name: Bootstrap Python dependencies
   hosts: all
@@ -20,7 +30,7 @@
     - name: Debug database host facts
       ansible.builtin.debug:
         msg: "Host {{ inventory_hostname }} has IP {{ ansible_default_ipv4.address | default('NO IP FOUND') }}"
-      when: inventory_hostname in groups['database']
+      when: "'database' in groups and inventory_hostname in groups['database']"
 
 - name: Deploy PostgreSQL Database
   hosts: database
@@ -31,7 +41,7 @@
       when: ansible_os_family == "RedHat"
       changed_when: false
   roles:
-    - postgresql
+    - role: postgresql
 
 - name: Deploy MinIO Object Storage
   hosts: minio
@@ -44,7 +54,9 @@
       changed_when: false
   roles:
     - role: minio
-      when: enable_minio | default(false)
+      when: >
+        packer_build | default(false) | bool or
+        enable_minio | default(false) | bool
 
 - name: Deploy Redis Cache
   hosts: redis
@@ -57,7 +69,7 @@
       changed_when: false
   roles:
     - role: redis
-      when: enable_redis | default(false)
+      when: packer_build | default(false) | bool or enable_redis | default(false)
 
 - name: Deploy Elasticsearch Search
   hosts: elasticsearch
@@ -71,6 +83,7 @@
   roles:
     - role: elasticsearch
       when: enable_elasticsearch | default(false)
+      tags: ['install', 'configure-base', 'runtime-config', 'service-start']
 
 - name: Deploy Mattermost Application
   hosts: app
@@ -81,6 +94,7 @@
       ansible.builtin.raw: dnf install -y python3-libselinux
       when: ansible_os_family == "RedHat"
       changed_when: false
+      tags: ['always']
 
     - name: Validate NTP time synchronization for HA cluster
       when:
@@ -161,15 +175,20 @@
       ansible.builtin.setup:
       delegate_to: "{{ groups['database'][0] }}"
       delegate_facts: true
+      when: groups.get('database', []) | length > 0
+      tags: ['runtime-config']
 
     - name: Set database host from facts
       ansible.builtin.set_fact:
         mattermost_db_host: "{{ hostvars[groups['database'][0]]['ansible_default_ipv4']['address'] }}"
+      when: groups.get('database', []) | length > 0
+      tags: ['runtime-config']
 
     - name: Set site URL from facts (single node)
       ansible.builtin.set_fact:
         mattermost_site_url: "http://{{ ansible_default_ipv4.address }}:8065"
       when: groups.app | length == 1
+      tags: ['runtime-config']
 
     - name: Set site URL from load balancer (HA cluster)
       ansible.builtin.set_fact:
@@ -177,6 +196,7 @@
       when:
         - groups.app | length > 1
         - groups.get('loadbalancer', []) | length > 0
+      tags: ['runtime-config']
 
     - name: Gather facts from rtcd host
       ansible.builtin.setup:
@@ -186,6 +206,7 @@
       when:
         - enable_calls | default(false)
         - groups.get('rtcd', []) | length > 0
+      tags: ['runtime-config']
 
     - name: Set rtcd URL for Mattermost Calls plugin
       ansible.builtin.set_fact:
@@ -193,6 +214,7 @@
       when:
         - enable_calls | default(false)
         - groups.get('rtcd', []) | length > 0
+      tags: ['runtime-config']
 
     - name: Gather facts from minio host
       ansible.builtin.setup:
@@ -202,6 +224,7 @@
       when:
         - enable_minio | default(false)
         - groups.get('minio', []) | length > 0
+      tags: ['runtime-config']
 
     - name: Set MinIO host from facts
       ansible.builtin.set_fact:
@@ -209,8 +232,9 @@
       when:
         - enable_minio | default(false)
         - groups.get('minio', []) | length > 0
+      tags: ['runtime-config']
   roles:
-    - mattermost
+    - role: mattermost
 
 - name: Deploy Load Balancer (nginx)
   hosts: loadbalancer
@@ -245,9 +269,10 @@
       when: groups.app | default([]) | length > 1
   roles:
     - role: nginx
-      when: use_nginx | default(false) or groups.app | length > 1
+      when: packer_build | default(false) | bool or use_nginx | default(false) or groups.app | default([]) | length > 1
     - role: certbot
       when: use_tls | default(false)
+      tags: ['install', 'configure-base', 'runtime-config']
 
 - name: Deploy RTCD Service
   hosts: rtcd
@@ -262,6 +287,7 @@
   roles:
     - role: rtcd
       when: enable_calls | default(false)
+      tags: ['install', 'configure-base', 'runtime-config', 'service-start']
 
 - name: Deploy coturn TURN Server
   hosts: coturn
@@ -275,6 +301,7 @@
   roles:
     - role: coturn
       when: enable_coturn | default(false)
+      tags: ['install', 'configure-base', 'runtime-config', 'service-start']
 
 - name: Deploy Prometheus Monitoring
   hosts: monitoring
@@ -288,6 +315,7 @@
   roles:
     - role: prometheus
       when: enable_monitoring | default(false)
+      tags: ['install', 'configure-base', 'runtime-config', 'service-start']
 
 - name: Deploy Grafana Visualization
   hosts: monitoring
@@ -296,6 +324,7 @@
   roles:
     - role: grafana
       when: enable_monitoring | default(false)
+      tags: ['install', 'configure-base', 'runtime-config', 'service-start']
 
 - name: Deploy Node Exporter on Mattermost Servers
   hosts: app
@@ -304,6 +333,7 @@
   roles:
     - role: node_exporter
       when: enable_monitoring | default(false)
+      tags: ['install', 'configure-base']
 
 - name: Deploy calls-offloader Service
   hosts: calls_offloader
@@ -318,9 +348,9 @@
   roles:
     - role: docker
     - role: calls-offloader
-      when:
-        - mattermost_calls_enable_recording | default(false)
-        - enable_calls | default(false)
+      when: >
+        packer_build | default(false) | bool or
+        (mattermost_calls_enable_recording | default(false) and enable_calls | default(false))
 
 - name: Deploy Keycloak Service
   hosts: keycloak
@@ -345,6 +375,7 @@
   roles:
     - role: keycloak
       when: enable_keycloak | default(false)
+      tags: ['install', 'configure-base', 'runtime-config', 'service-start']
 
 - name: Deploy OpenLDAP Services
   hosts: ldap
@@ -358,6 +389,7 @@
   roles:
     - role: openldap
       when: enable_ldap | default(false)
+      tags: ['install', 'configure-base', 'runtime-config', 'service-start']
 
 - name: Display deployment information
   hosts: app
@@ -438,6 +470,7 @@
   roles:
     - role: disa-stig
       when: disa_stig_enabled | default(false)
+      tags: ['configure-base']
 
   post_tasks:
     - name: Find XCCDF report in temp directory

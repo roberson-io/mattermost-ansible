@@ -2,7 +2,7 @@
 # Staging environment configuration
 
 # PostgreSQL configuration
-postgresql_version: "16"  # Note: Mattermost v11.0+ requires PostgreSQL 14 or higher
+postgresql_version: "18"  # Note: Mattermost v11.0+ requires PostgreSQL 14 or higher
 postgresql_allow_remote: true
 postgresql_listen_addresses: "*"
 postgresql_db_name: mattermost
@@ -27,7 +27,7 @@ postgresql_db_password: "{{ vault_staging_db_password }}"
 #   - "postgres://{{ postgresql_db_user }}:{{ vault_staging_db_password }}@search-replica-staging.example.com:5432/{{ postgresql_db_name }}?sslmode=disable"
 
 # Mattermost configuration
-mattermost_version: "11.0.4"
+mattermost_version: "11.3.0"
 mattermost_db_host: "{{ hostvars[groups['database'][0]]['ansible_default_ipv4']['address'] }}"
 mattermost_db_port: 5432
 mattermost_db_name: mattermost
@@ -62,7 +62,7 @@ certbot_create_if_missing: true
 # Mattermost Calls configuration (optional)
 # Enable Calls by setting enable_calls to true and configuring an rtcd host in inventory
 # enable_calls: true
-# rtcd_version: "v1.2.1"
+# rtcd_version: "v1.2.4"
 # rtcd_api_listen_address: "0.0.0.0:8045"
 # rtcd_ice_port_udp: 8443
 # rtcd_ice_port_tcp: 8443
@@ -83,7 +83,7 @@ certbot_create_if_missing: true
 # Mattermost Boards configuration (optional)
 # Enable Boards plugin for project management features
 # mattermost_enable_boards: true
-# mattermost_boards_version: "9.2.0"
+# mattermost_boards_version: "9.2.2"
 
 # MinIO Object Storage configuration (optional)
 # Enable MinIO by setting enable_minio to true and configuring a minio host in inventory
@@ -102,7 +102,7 @@ certbot_create_if_missing: true
 # Keycloak Identity Provider configuration (optional)
 # Enable Keycloak by setting enable_keycloak to true and configuring a keycloak host in inventory
 # enable_keycloak: true
-# keycloak_version: "26.4.2"  # Optional: specify version
+# keycloak_version: "26.4.4"  # Optional: specify version
 # keycloak_hostname: "keycloak-staging.example.com"
 # keycloak_admin_user: admin
 # keycloak_admin_password: "{{ vault_staging_keycloak_admin_password }}"

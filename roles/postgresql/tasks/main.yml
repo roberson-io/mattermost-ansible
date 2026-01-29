@@ -2,6 +2,7 @@
 - name: Include OS-specific variables
   ansible.builtin.include_vars: "{{ ansible_os_family }}.yml"
 
+  tags: ['install']
 - name: Update apt cache (Debian/Ubuntu)
   ansible.builtin.apt:
     update_cache: true
@@ -9,6 +10,7 @@
   when: ansible_os_family == "Debian"
 
 # Add official PostgreSQL repositories
+  tags: ['install']
 - name: Install required packages for repository (Debian/Ubuntu)
   ansible.builtin.apt:
     name:
@@ -17,6 +19,7 @@
     state: present
   when: ansible_os_family == "Debian"
 
+  tags: ['install']
 - name: Add PostgreSQL APT key (Debian/Ubuntu)
   ansible.builtin.get_url:
     url: "{{ postgresql_apt_key_url }}"
@@ -24,6 +27,7 @@
     mode: '0644'
   when: ansible_os_family == "Debian"
 
+  tags: ['install']
 - name: Add PostgreSQL APT repository (Debian/Ubuntu)
   ansible.builtin.apt_repository:
     repo: "deb [signed-by=/usr/share/keyrings/postgresql-archive-keyring.asc] {{ postgresql_apt_repository.split('deb ')[1] }}"
@@ -32,6 +36,7 @@
     update_cache: true
   when: ansible_os_family == "Debian"
 
+  tags: ['install']
 - name: Add PostgreSQL RPM repository (RedHat)
   ansible.builtin.dnf:
     name: "{{ postgresql_rpm_repo_url }}"
@@ -39,6 +44,7 @@
     disable_gpg_check: true
   when: ansible_os_family == "RedHat"
 
+  tags: ['install']
 - name: Disable built-in PostgreSQL module (RedHat 8+)
   ansible.builtin.shell: dnf -qy module disable postgresql
   args:
@@ -50,6 +56,7 @@
     - ansible_distribution_major_version | int >= 8
 
 # Check for existing PostgreSQL installation
+  tags: ['install']
 - name: Check if PostgreSQL is already installed (Debian/Ubuntu)
   ansible.builtin.shell: |
     set -o pipefail
@@ -61,6 +68,7 @@
   failed_when: false
   when: ansible_os_family == "Debian"
 
+  tags: ['install']
 - name: Check if PostgreSQL is already installed (RedHat)
   ansible.builtin.shell: |
     set -o pipefail
@@ -72,6 +80,7 @@
   failed_when: false
   when: ansible_os_family == "RedHat"
 
+  tags: ['install']
 - name: Set PostgreSQL version facts
   ansible.builtin.set_fact:
     postgresql_installed_version: >-
@@ -81,12 +90,14 @@
       {{ (postgresql_current_version_debian.rc == 0 if ansible_os_family == 'Debian'
       else postgresql_current_version_redhat.rc == 0) }}
 
+  tags: ['install']
 - name: Set version comparison facts
   ansible.builtin.set_fact:
     postgresql_needs_install: "{{ not postgresql_is_installed }}"
     postgresql_needs_upgrade: >-
       {{ postgresql_is_installed and postgresql_installed_version != postgresql_version }}
 
+  tags: ['install']
 - name: Display version information
   ansible.builtin.debug:
     msg:
@@ -98,6 +109,7 @@
         else 'none (already at desired version)') }}
 
 # Backup and upgrade/downgrade logic
+  tags: ['install']
 - name: Handle PostgreSQL upgrade/downgrade
   when: postgresql_needs_upgrade
   block:
@@ -150,11 +162,13 @@
       register: postgresql_redhat_backup
 
 # Install PostgreSQL packages
+  tags: ['install']
 - name: Install PostgreSQL packages
   ansible.builtin.package:
     name: "{{ postgresql_packages }}"
     state: present
 
+  tags: ['install']
 - name: Initialize PostgreSQL database (RedHat)
   ansible.builtin.command: "/usr/pgsql-{{ postgresql_version }}/bin/postgresql-{{ postgresql_version }}-setup initdb"
   args:
@@ -164,6 +178,7 @@
     - postgresql_needs_install
 
 # Data migration for upgrades
+  tags: ['configure-base']
 - name: Perform data migration after upgrade
   when:
     - postgresql_needs_upgrade
@@ -213,6 +228,7 @@
           - "=========================================="
 
 # Start PostgreSQL for fresh installs
+  tags: ['configure-base']
 - name: Start and enable PostgreSQL
   ansible.builtin.systemd:
     name: "{{ postgresql_service_name }}"
@@ -220,6 +236,7 @@
     enabled: true
   when: postgresql_needs_install
 
+  tags: ['configure-base']
 - name: Find PostgreSQL config file (Debian/Ubuntu)
   ansible.builtin.find:
     paths: "{{ postgresql_config_dir }}"
@@ -228,18 +245,21 @@
   register: postgresql_config_files
   when: ansible_os_family == "Debian"
 
+  tags: ['runtime-config']
 - name: Set PostgreSQL config path (Debian/Ubuntu)
   ansible.builtin.set_fact:
     postgresql_conf_path: "{{ postgresql_config_files.files[0].path }}"
     postgresql_hba_path: "{{ postgresql_config_files.files[0].path | dirname }}/pg_hba.conf"
   when: ansible_os_family == "Debian"
 
+  tags: ['runtime-config']
 - name: Set PostgreSQL config path (RedHat)
   ansible.builtin.set_fact:
     postgresql_conf_path: "{{ postgresql_config_file }}"
     postgresql_hba_path: "{{ postgresql_hba_file }}"
   when: ansible_os_family == "RedHat"
 
+  tags: ['runtime-config']
 - name: Configure PostgreSQL password encryption to scram-sha-256
   ansible.builtin.lineinfile:
     path: "{{ postgresql_conf_path }}"
@@ -248,6 +268,7 @@
     state: present
   notify: Restart postgresql
 
+  tags: ['runtime-config']
 - name: Configure PostgreSQL to listen on all interfaces
   ansible.builtin.lineinfile:
     path: "{{ postgresql_conf_path }}"
@@ -257,6 +278,7 @@
   notify: Restart postgresql
   when: postgresql_allow_remote
 
+  tags: ['runtime-config']
 - name: Configure PostgreSQL max_connections
   ansible.builtin.lineinfile:
     path: "{{ postgresql_conf_path }}"
@@ -265,6 +287,7 @@
     state: present
   notify: Restart postgresql
 
+  tags: ['runtime-config']
 - name: Configure PostgreSQL shared_buffers
   ansible.builtin.lineinfile:
     path: "{{ postgresql_conf_path }}"
@@ -273,6 +296,7 @@
     state: present
   notify: Restart postgresql
 
+  tags: ['runtime-config']
 - name: Configure PostgreSQL effective_cache_size
   ansible.builtin.lineinfile:
     path: "{{ postgresql_conf_path }}"
@@ -281,6 +305,7 @@
     state: present
   notify: Restart postgresql
 
+  tags: ['runtime-config']
 - name: Configure PostgreSQL work_mem
   ansible.builtin.lineinfile:
     path: "{{ postgresql_conf_path }}"
@@ -289,6 +314,7 @@
     state: present
   notify: Restart postgresql
 
+  tags: ['runtime-config']
 - name: Configure PostgreSQL maintenance_work_mem
   ansible.builtin.lineinfile:
     path: "{{ postgresql_conf_path }}"
@@ -297,6 +323,7 @@
     state: present
   notify: Restart postgresql
 
+  tags: ['runtime-config']
 - name: Configure PostgreSQL random_page_cost
   ansible.builtin.lineinfile:
     path: "{{ postgresql_conf_path }}"
@@ -305,6 +332,7 @@
     state: present
   notify: Restart postgresql
 
+  tags: ['runtime-config']
 - name: Configure PostgreSQL autovacuum_max_workers
   ansible.builtin.lineinfile:
     path: "{{ postgresql_conf_path }}"
@@ -313,6 +341,7 @@
     state: present
   notify: Restart postgresql
 
+  tags: ['runtime-config']
 - name: Configure PostgreSQL max_worker_processes
   ansible.builtin.lineinfile:
     path: "{{ postgresql_conf_path }}"
@@ -321,6 +350,7 @@
     state: present
   notify: Restart postgresql
 
+  tags: ['runtime-config']
 - name: Configure PostgreSQL wal_level
   ansible.builtin.lineinfile:
     path: "{{ postgresql_conf_path }}"
@@ -329,6 +359,7 @@
     state: present
   notify: Restart postgresql
 
+  tags: ['runtime-config']
 - name: Configure PostgreSQL max_wal_senders
   ansible.builtin.lineinfile:
     path: "{{ postgresql_conf_path }}"
@@ -337,6 +368,7 @@
     state: present
   notify: Restart postgresql
 
+  tags: ['runtime-config']
 - name: Configure PostgreSQL wal_keep_size
   ansible.builtin.lineinfile:
     path: "{{ postgresql_conf_path }}"
@@ -345,6 +377,7 @@
     state: present
   notify: Restart postgresql
 
+  tags: ['runtime-config']
 - name: Configure PostgreSQL hot_standby
   ansible.builtin.lineinfile:
     path: "{{ postgresql_conf_path }}"
@@ -353,6 +386,7 @@
     state: present
   notify: Restart postgresql
 
+  tags: ['runtime-config']
 - name: Configure PostgreSQL hot_standby_feedback
   ansible.builtin.lineinfile:
     path: "{{ postgresql_conf_path }}"
@@ -361,6 +395,7 @@
     state: present
   notify: Restart postgresql
 
+  tags: ['runtime-config']
 - name: Configure PostgreSQL to allow remote connections for Mattermost
   ansible.builtin.lineinfile:
     path: "{{ postgresql_hba_path }}"
@@ -369,6 +404,7 @@
   notify: Restart postgresql
   when: postgresql_allow_remote
 
+  tags: ['runtime-config']
 - name: Configure PostgreSQL to allow remote connections for Keycloak
   ansible.builtin.lineinfile:
     path: "{{ postgresql_hba_path }}"
@@ -380,15 +416,18 @@
     - keycloak_db_name is defined
     - keycloak_db_user is defined
 
+  tags: ['runtime-config']
 - name: Flush handlers to ensure PostgreSQL is restarted
   ansible.builtin.meta: flush_handlers
 
+  tags: ['runtime-config']
 - name: Wait for PostgreSQL to be ready after configuration
   ansible.builtin.wait_for:
     port: 5432
     delay: 2
     timeout: 30
 
+  tags: ['runtime-config']
 - name: Configure firewall for PostgreSQL
   when: postgresql_firewall_enabled
   block:
@@ -442,6 +481,7 @@
           loop: "{{ postgresql_firewall_allowed_sources }}"
           when: postgresql_firewall_allowed_sources | length > 0
 
+  tags: ['runtime-config']
 - name: Create Mattermost database
   become: true
   become_user: postgres
@@ -449,6 +489,7 @@
     name: "{{ postgresql_db_name }}"
     state: present
 
+  tags: ['runtime-config']
 - name: Create Mattermost database user
   become: true
   become_user: postgres
@@ -460,6 +501,7 @@
   environment:
     PGOPTIONS: "-c password_encryption=scram-sha-256"
 
+  tags: ['runtime-config']
 - name: Grant database privileges to Mattermost user
   become: true
   become_user: postgres
@@ -470,6 +512,7 @@
     privs: ALL
     state: present
 
+  tags: ['runtime-config']
 - name: Grant schema privileges to Mattermost user
   become: true
   become_user: postgres
@@ -481,6 +524,7 @@
     privs: ALL
     state: present
 
+  tags: ['runtime-config']
 # Keycloak database setup
 - name: Create Keycloak database
   become: true
@@ -493,6 +537,7 @@
     - keycloak_db_user is defined
     - keycloak_db_password is defined
 
+  tags: ['runtime-config']
 - name: Create Keycloak database user
   become: true
   become_user: postgres
@@ -508,6 +553,7 @@
     - keycloak_db_user is defined
     - keycloak_db_password is defined
 
+  tags: ['runtime-config']
 - name: Grant database privileges to Keycloak user
   become: true
   become_user: postgres
@@ -522,6 +568,7 @@
     - keycloak_db_user is defined
     - keycloak_db_password is defined
 
+  tags: ['runtime-config']
 - name: Grant schema privileges to Keycloak user
   become: true
   become_user: postgres
@@ -536,3 +583,4 @@
     - keycloak_db_name is defined
     - keycloak_db_user is defined
     - keycloak_db_password is defined
+  tags: ['runtime-config']
