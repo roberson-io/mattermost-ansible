@@ -15,6 +15,11 @@ mattermost_db_port: 5432
 mattermost_db_name: mattermost
 mattermost_db_user: mmuser
 mattermost_db_password: "mmuser_password_change_me"
+# SSL mode for the Postgres DataSource string. "disable" suits role-deployed
+# local Postgres on the same VNet. Managed services (Azure Postgres Flex,
+# RDS, Cloud SQL, etc.) enforce TLS at the server side — override to "require"
+# (or stricter: "verify-ca" / "verify-full") in group_vars.
+mattermost_db_sslmode: disable
 
 # Database read replicas for HA (optional)
 # List of read replica connection strings for load balancing read queries

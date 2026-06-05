@@ -467,7 +467,7 @@
           {{ mattermost_install_path }}/bin/mmctl --local config migrate
           {{ mattermost_install_path }}/config/config.json
           'postgres://{{ mattermost_db_user }}:{{ mattermost_db_password }}@{{ mattermost_db_host }}:{{ mattermost_db_port }}/
-          {{ mattermost_db_name }}?sslmode=disable&connect_timeout=10'
+          {{ mattermost_db_name }}?sslmode={{ mattermost_db_sslmode }}&connect_timeout=10'
       become: true
       become_user: mattermost
       register: mattermost_migrate_to_db
@@ -559,7 +559,7 @@
         regexp: '"DataSource":\s*"postgres://[^"]*"'
         replace: >-
           "DataSource": "postgres://{{ mattermost_db_user }}:{{ mattermost_db_password }}@{{
-          mattermost_db_host }}:{{ mattermost_db_port }}/{{ mattermost_db_name }}?sslmode=disable&connect_timeout=10"
+          mattermost_db_host }}:{{ mattermost_db_port }}/{{ mattermost_db_name }}?sslmode={{ mattermost_db_sslmode }}&connect_timeout=10"
 
     - name: Configure Mattermost site URL
       ansible.builtin.replace:

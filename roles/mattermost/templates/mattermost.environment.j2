@@ -3,7 +3,7 @@
 
 # MM_CONFIG points to database instead of file-based config.json
 # When set, Mattermost stores configuration in the database
-MM_CONFIG='postgres://{{ mattermost_db_user }}:{{ mattermost_db_password }}@{{ mattermost_db_host }}:{{ mattermost_db_port }}/{{ mattermost_db_name }}?sslmode=disable&connect_timeout=10'
+MM_CONFIG='postgres://{{ mattermost_db_user }}:{{ mattermost_db_password }}@{{ mattermost_db_host }}:{{ mattermost_db_port }}/{{ mattermost_db_name }}?sslmode={{ mattermost_db_sslmode }}&connect_timeout=10'
 
 # Service environment (production, test, or dev)
 MM_SERVICEENVIRONMENT={{ mattermost_service_environment }}
