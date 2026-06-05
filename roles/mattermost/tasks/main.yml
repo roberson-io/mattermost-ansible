@@ -89,7 +89,7 @@
     owner: postgres
     group: postgres
     mode: "0750"
-  delegate_to: "{{ groups.database | first }}"
+  delegate_to: "{{ (groups['database'] | default([]))[0] | default(inventory_hostname) }}"
   become: true
   when:
     - mattermost_needs_upgrade
@@ -102,7 +102,7 @@
     name: "{{ mattermost_db_name }}"
     state: dump
     target: "{{ mattermost_backup_dir }}/mattermost-db-backup-{{ ansible_date_time.iso8601_basic_short }}.sql"
-  delegate_to: "{{ groups.database | first }}"
+  delegate_to: "{{ (groups['database'] | default([]))[0] | default(inventory_hostname) }}"
   become: true
   become_user: postgres
   register: mattermost_db_backup
@@ -761,6 +761,52 @@
     msg: "License upload: {{ mattermost_license_upload.stdout | default('No output') }}"
   tags: ['runtime-config']
   when: mattermost_license_file | length > 0
+
+#
+# SiteURL configuration for database config mode
+# When using database config storage, SiteURL must be set via mmctl, not config.json
+#
+- name: Wait for Mattermost to be ready (database config mode for SiteURL)
+  ansible.builtin.uri:
+    url: "http://localhost:8065/api/v4/system/ping"
+    status_code: 200
+  tags: ['runtime-config']
+  register: mattermost_db_siteurl_ping
+  until: mattermost_db_siteurl_ping.status == 200
+  retries: 30
+  delay: 2
+  when:
+    - mattermost_config_storage == "database"
+    - mattermost_site_url | default('') | length > 0
+
+- name: Get current SiteURL (database config mode)
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config get ServiceSettings.SiteURL
+  become: true
+  become_user: mattermost
+  register: mattermost_current_siteurl
+  changed_when: false
+  failed_when: false
+  run_once: true
+  when:
+    - mattermost_config_storage == "database"
+    - mattermost_site_url | default('') | length > 0
+  tags: ['runtime-config']
+
+- name: Configure SiteURL via mmctl (database config mode)
+  ansible.builtin.command:
+    cmd: >
+      {{ mattermost_install_path }}/bin/mmctl --local config set ServiceSettings.SiteURL '{{ mattermost_site_url }}'
+  become: true
+  become_user: mattermost
+  changed_when: true
+  run_once: true
+  when:
+    - mattermost_config_storage == "database"
+    - mattermost_site_url | default('') | length > 0
+    - mattermost_site_url not in (mattermost_current_siteurl.stdout | default(''))
+  tags: ['runtime-config']
 
 #
 # Redis cache configuration (optional)
@@ -1944,6 +1990,7 @@
   become_user: mattermost
   register: mattermost_calls_patch_result
   changed_when: true
+  run_once: true
   when:
     - mattermost_enable_calls | bool
   tags: ['runtime-config']
