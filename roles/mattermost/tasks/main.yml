@@ -89,7 +89,7 @@
     owner: postgres
     group: postgres
     mode: "0750"
-  delegate_to: "{{ groups.database | first }}"
+  delegate_to: "{{ (groups['database'] | default([]))[0] | default(inventory_hostname) }}"
   become: true
   when:
     - mattermost_needs_upgrade
@@ -102,7 +102,7 @@
     name: "{{ mattermost_db_name }}"
     state: dump
     target: "{{ mattermost_backup_dir }}/mattermost-db-backup-{{ ansible_date_time.iso8601_basic_short }}.sql"
-  delegate_to: "{{ groups.database | first }}"
+  delegate_to: "{{ (groups['database'] | default([]))[0] | default(inventory_hostname) }}"
   become: true
   become_user: postgres
   register: mattermost_db_backup
