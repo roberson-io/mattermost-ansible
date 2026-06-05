@@ -14,6 +14,16 @@
     - inventory_hostname != ansible_hostname
   tags: ['runtime-config']
 
+# Azure Ubuntu base images ship a /etc/apt/sources.list.d/microsoft-prod.list
+# pinned to "bionic" which breaks `apt update` on Ubuntu 26.04 with a stale
+# signature error. Remove it before refreshing the cache.
+- name: Remove stale Azure microsoft-prod.list (Debian/Ubuntu)
+  ansible.builtin.file:
+    path: /etc/apt/sources.list.d/microsoft-prod.list
+    state: absent
+  when: ansible_os_family == "Debian"
+  tags: ['install']
+
 - name: Update apt cache (Debian/Ubuntu)
   ansible.builtin.apt:
     update_cache: true

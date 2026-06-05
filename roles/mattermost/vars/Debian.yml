@@ -4,5 +4,6 @@ mattermost_packages:
   - curl
   - tar
   - jq
+  - acl
 
 mattermost_firewall_package: ufw
