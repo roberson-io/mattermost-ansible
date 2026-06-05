@@ -188,7 +188,7 @@
 
     - name: Gather facts from database host
       ansible.builtin.setup:
-      delegate_to: "{{ groups['database'][0] }}"
+      delegate_to: "{{ (groups['database'] | default([]))[0] | default(inventory_hostname) }}"
       delegate_facts: true
       when: groups.get('database', []) | length > 0
       tags: ['runtime-config']
@@ -201,13 +201,13 @@
 
     - name: Set site URL from facts (single node)
       ansible.builtin.set_fact:
-        mattermost_site_url: "http://{{ ansible_default_ipv4.address }}:8065"
+        mattermost_site_url: "{{ 'https' if use_tls | default(false) else 'http' }}://{{ ansible_default_ipv4.address }}:8065"
       when: groups.app | length == 1
       tags: ['runtime-config']
 
     - name: Set site URL from load balancer (HA cluster)
       ansible.builtin.set_fact:
-        mattermost_site_url: "http://{{ hostvars[groups['loadbalancer'][0]]['ansible_default_ipv4']['address'] }}"
+        mattermost_site_url: "{{ 'https' if use_tls | default(false) else 'http' }}://{{ hostvars[groups['loadbalancer'][0]]['ansible_default_ipv4']['address'] }}"
       when:
         - groups.app | length > 1
         - groups.get('loadbalancer', []) | length > 0
@@ -286,7 +286,7 @@
     - role: nginx
       when: packer_build | default(false) | bool or use_nginx | default(false) or groups.app | default([]) | length > 1
     - role: certbot
-      when: use_tls | default(false)
+      when: use_tls | default(false) and not nginx_generate_self_signed_cert | default(false)
       tags: ['install', 'configure-base', 'runtime-config']
 
 - name: Deploy RTCD Service
@@ -379,7 +379,7 @@
 
     - name: Gather facts from database host for Keycloak
       ansible.builtin.setup:
-      delegate_to: "{{ groups['database'][0] }}"
+      delegate_to: "{{ (groups['database'] | default([]))[0] | default(inventory_hostname) }}"
       delegate_facts: true
       when: groups.get('database', []) | length > 0
 
