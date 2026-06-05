@@ -22,6 +22,55 @@
   notify: Reload nginx
   tags: ['configure-base']
 
+# Self-signed SSL certificate generation (for local/testing environments)
+- name: Create SSL directory
+  ansible.builtin.file:
+    path: "{{ nginx_ssl_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  when: nginx_ssl_enabled
+  tags: ['configure-base']
+
+- name: Check if self-signed certificate exists
+  ansible.builtin.stat:
+    path: "{{ nginx_ssl_cert_path }}"
+  register: nginx_ssl_cert_stat
+  when:
+    - nginx_ssl_enabled
+    - nginx_generate_self_signed_cert
+  tags: ['configure-base']
+
+- name: Generate self-signed SSL certificate
+  ansible.builtin.command:
+    cmd: >
+      openssl req -x509 -nodes -days 365 -newkey rsa:2048
+      -keyout {{ nginx_ssl_key_path }}
+      -out {{ nginx_ssl_cert_path }}
+      -subj "/C=US/ST=State/L=City/O=Organization/CN={{ nginx_server_name }}"
+  args:
+    creates: "{{ nginx_ssl_cert_path }}"
+  when:
+    - nginx_ssl_enabled
+    - nginx_generate_self_signed_cert
+    - not nginx_ssl_cert_stat.stat.exists | default(true)
+  tags: ['configure-base']
+
+- name: Set SSL certificate permissions
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ nginx_ssl_cert_path }}", mode: '0644' }
+    - { path: "{{ nginx_ssl_key_path }}", mode: '0600' }
+  when:
+    - nginx_ssl_enabled
+    - nginx_generate_self_signed_cert
+  tags: ['configure-base']
+
 # Rocky Linux 9 embeds a default server block in nginx.conf that catches all requests
 # Deploy a clean nginx.conf without the embedded server block for RedHat systems
 - name: Deploy nginx.conf without default server block (RedHat)

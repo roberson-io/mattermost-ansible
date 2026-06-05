@@ -36,8 +36,11 @@ server {
     ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
     ssl_prefer_server_ciphers off;
     ssl_session_cache shared:SSL:50m;
+{% if not nginx_generate_self_signed_cert | default(false) %}
+    # OCSP stapling - only enabled for CA-signed certificates
     ssl_stapling on;
     ssl_stapling_verify on;
+{% endif %}
 {% else %}
     listen 80;
 {% endif %}

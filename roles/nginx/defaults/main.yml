@@ -28,10 +28,19 @@ nginx_lb_algorithm: "ip_hash"
 nginx_max_fails: 3  # Number of failed attempts before marking server as unavailable
 nginx_fail_timeout: 30  # Time in seconds to mark server unavailable after max_fails
 
-# SSL/TLS configuration (paths will be set by certbot)
+# SSL/TLS configuration
 nginx_ssl_enabled: true
-nginx_ssl_cert_path: "/etc/letsencrypt/live/{{ nginx_server_name }}/fullchain.pem"
-nginx_ssl_key_path: "/etc/letsencrypt/live/{{ nginx_server_name }}/privkey.pem"
+
+# Self-signed certificate generation (for local/testing environments)
+# Set to true to generate a self-signed certificate
+nginx_generate_self_signed_cert: false
+nginx_ssl_dir: "/etc/nginx/ssl"
+
+# Certificate paths
+# Automatically uses Let's Encrypt paths when certbot_create_if_missing is true
+# Otherwise uses self-signed certificate paths
+nginx_ssl_cert_path: "{{ '/etc/letsencrypt/live/' + nginx_server_name + '/fullchain.pem' if certbot_create_if_missing | default(false) else nginx_ssl_dir + '/mattermost.crt' }}"
+nginx_ssl_key_path: "{{ '/etc/letsencrypt/live/' + nginx_server_name + '/privkey.pem' if certbot_create_if_missing | default(false) else nginx_ssl_dir + '/mattermost.key' }}"
 
 # HTTP to HTTPS redirect
 nginx_force_https: true
